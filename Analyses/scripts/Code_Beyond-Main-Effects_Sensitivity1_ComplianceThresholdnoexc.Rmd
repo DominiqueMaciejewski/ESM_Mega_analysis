@@ -1,0 +1,2348 @@
+---
+title: SENSITIVITY ANALYSES I (no compliance exclusion)- Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms
+author: "BLINDED"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    keep_tex: yes
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# EXPLANATION
+This is the sensitivity analysis for the main findings of the paper, when a no compliance exclusion criterion was applied (i.e., all participants were  included for analyses regardless of their level of compliance)   
+
+Only the significant interaction was repeated. For results jump to MEGA-ANALYSIS.
+
+# LIBRARY 
+```{r library, cache=FALSE}
+
+options(scipen=999) #to prevent scientific notation
+
+
+library(haven)  #for reading in SPSS files
+library(esmpack) #for data preparation of ESM data
+library(data.table) #for data.tables, subsetting
+library(psych) #for descriptives and affective dynamics calculations (count, M, SD)
+library(DescTools) #for winsorizing outliers
+library(tibble) #for reshaping
+library(tidyverse) #for data wrangling
+library(Hmisc) #for correlations
+library(here) #for finding files
+library(plyr) #for data wrangling
+library(dplyr)#for data wrangling
+library(ggplot2) #for data visualization
+library(ggpubr) #for data visualization
+library(lme4) #for autocorrelation and ICCs
+library(optimx) #optimizer for MLM models
+library(lavaan) #for MCFA's
+library(performance) #for ICC
+library(fastDummies) #for making dummy variables
+library(lm.beta) #for standardized estimates from lm
+library(multilevelTools) #for omega calculation
+library(pander) #for tables
+library(knitr) #for tables
+library(interactions) #for Johnson-Neyman
+library(apaTables) #for apaTables
+library(jtools) #for nice regression tables
+library(car) #for VIF
+library(metafor) #for pooled correlations
+
+set.alignment('left', row.names = 'right') #for alignment of tables
+
+sessionInfo()
+
+```
+
+# FUNCTIONS
+```{r functions, cache=FALSE}
+
+#######FUNCTION 1: add missing days after each day/week (Daily Diary/ESM)
+##this is important, because for the MSSD, we do not want to calculate the
+##difference between the last beep of one day/week and the first beep of the next day/week
+##For the autocorrelation, the lagged function from the esmpack takes care of that automatically
+
+insert_NA <- function(df, ...){
+  df_selected <- df %>% dplyr::select(...) %>% unique()
+  result <- plyr::rbind.fill(df, df_selected) %>%
+    dplyr::arrange(...)
+  return(result)
+}
+
+#######FUNCTION 2: MSSD
+##from https://quantdev.ssri.psu.edu/tutorials/analysis-experience-sampling-ema-data-chapter-22-univariate-intraindividual-variability
+
+my.mssd <- function(data)
+{
+    diffToNext<-data[2:length(data)]-data[1:(length(data)-1)] #this computes the difference between each value and the next
+    diffToNext2<-diffToNext^2                  #this squares the difference
+    SSdiff<- sum(diffToNext2,na.rm=TRUE)       #this takes the sum of the squared differences
+    denominator<-sum(!is.na(diffToNext))       #this computes the number of non-missing elements (denominator)
+                                               #which corresponds to the t-1 value
+    mssd<-sqrt(SSdiff/denominator)             #this computes the rMSSD
+    return(mssd)
+}
+
+```
+
+# DATAPREPARATION PER DATASET
+
+## DATASET 1 - RADAR
+
+### Read in data and datapreparation
+```{r RADAR read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset1_RADAR_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset1_RADAR_processed.csv"), sep=",",
+                             na.strings="NA")
+
+####################### number of participants with valid Daily Diary data ##################### 
+dataset1_RADAR_processed$count<-calc.nomiss(PAff, ID, dataset1_RADAR_processed, prop=FALSE, expand=TRUE)
+range(dataset1_RADAR_processed$count)
+
+# exclude those with not valid daily diary data
+n_RADAR_orig<-nsub(ID, dataset1_RADAR_processed)
+n_RADAR_orig
+
+dataset1_RADAR_processed <-subset(dataset1_RADAR_processed, count > 0) 
+range(dataset1_RADAR_processed$count)
+
+n_RADAR_orig<-nsub(ID, dataset1_RADAR_processed)
+n_RADAR_orig
+
+
+```
+
+### Exclusion and Compliance
+
+
+```{r RADAR Exclusion and Compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_RADAR<-75
+#### Total weeks ####
+tot_weeks_RADAR <- 15
+#### Total beeps per day ####
+tot_b_d_RADAR<-1
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset1_RADAR_processed)) 
+
+#### Percentage of valid beeps before exclusion ####
+dataset1_RADAR_processed$perc<-100*(calc.nomiss(PAff, ID, dataset1_RADAR_processed, prop=TRUE, expand=TRUE))
+mean(calc.mean(perc, ID, data=dataset1_RADAR_processed)) 
+
+
+
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset1_RADAR_processed)
+
+## deleting ##
+dataset1_RADAR_processed <- check.timeinvar(NAff, ID, dataset1_RADAR_processed, out = 3)
+dataset1_RADAR_processed <- check.timeinvar(PAff, ID, dataset1_RADAR_processed, out = 3)
+
+
+## n after ##
+nsub(ID, dataset1_RADAR_processed) #no participants excluded
+
+#### final sample ####
+n_fin_RADAR<-nsub(ID, dataset1_RADAR_processed)
+n_fin_RADAR #number
+perc_inc_RADAR <- (100/n_RADAR_orig)*n_fin_RADAR
+perc_inc_RADAR #percentage
+
+
+#### mean of valid beeps per participant ####
+mean_comp_RADAR<-mean(calc.mean(count, ID, data=dataset1_RADAR_processed)) 
+mean_comp_RADAR 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_RADAR<-mean(calc.mean(perc, ID, data=dataset1_RADAR_processed)) 
+mean_com_per_RADAR
+
+
+```
+
+
+
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r RADAR affective dynamics dataprep, cache=FALSE}
+
+#####################  sort by ID and time #####################
+dataset1_RADAR_processed<-dataset1_RADAR_processed[order(dataset1_RADAR_processed$ID,dataset1_RADAR_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset1_RADAR_processed_affdyn <- subset(dataset1_RADAR_processed, select=c("ID","time","week","PAff","NAff"))
+
+##################### delete missing values #####################
+#so that differences are also calculated between beeps that were
+#not directly next to each other (e.g., 3, 4(NA), 5) 
+#I still want to calculate the difference between 3 and 5
+dataset1_RADAR_processed_affdyn<-dataset1_RADAR_processed_affdyn[!is.na(dataset1_RADAR_processed_affdyn$PAff),]
+
+##################### make a new time variable #####################
+dataset1_RADAR_processed_affdyn<-dataset1_RADAR_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+dataset1_RADAR_processed_affdyn_NA <-insert_NA(dataset1_RADAR_processed_affdyn, ID, week)
+
+``` 
+
+#### Calculation
+
+For count, M, SD, MSSD, see <https://quantdev.ssri.psu.edu/tutorials/analysis-experience-sampling-ema-data-chapter-22-univariate-intraindividual-variability>
+
+For autocorrelation, see de Haan-Rietdijk et al. (2016)
+
+```{r RADAR affective dynamics calculation, cache=FALSE}
+
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+aff_dyn_RADAR <- ddply(dataset1_RADAR_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountPA = sum(!is.na(PAff)),  #count of observations
+                           imeanPA  = mean(PAff, na.rm=TRUE), #imean (continuous)
+                           isdPA    = sd(PAff, na.rm=TRUE)   #isd   (continuous)  
+                           )
+
+#### MSSD ####
+mssd.stats.NA <- ddply(dataset1_RADAR_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.PA <- ddply(dataset1_RADAR_processed_affdyn_NA, "ID", plyr::summarize, iMSSDPA=my.mssd(PAff))
+
+aff_dyn_RADAR <- merge(aff_dyn_RADAR,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_RADAR <- merge(aff_dyn_RADAR,mssd.stats.PA,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+## Lagged effect ##
+dataset1_RADAR_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=week,data=dataset1_RADAR_processed_affdyn)
+dataset1_RADAR_processed_affdyn$PAff_lag<-lagvar(PAff, id=ID, obs=time, day=week,data=dataset1_RADAR_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset1_RADAR_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_PA <- lmer(PAff ~ 1 + PAff_lag + (1 + PAff_lag | ID), 
+                     data = dataset1_RADAR_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_PA)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_PA<-tibble::rownames_to_column(coef(auto_PA)$ID)
+beta_PA<-plyr::rename(beta_PA, 
+                c("PAff_lag" = "autocorPA",
+                  "rowname" =  "ID"))
+
+
+##################### Merge data #####################
+aff_dyn_RADAR <- merge(aff_dyn_RADAR,beta_NA,by="ID",all=TRUE)
+aff_dyn_RADAR <- merge(aff_dyn_RADAR,beta_PA,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_RADAR<-subset(aff_dyn_RADAR, select=c(1:9,11,13))
+names(aff_dyn_RADAR)
+
+```
+
+### Merging
+
+```{r RADAR merging observations, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_RADAR <- subset(dataset1_RADAR_processed, select=c("ID","Sex","Age","DepB","DepF"))
+data_id_dep_RADAR<-data_id_dep_RADAR %>% group_by(ID) %>% summarise_all(mean)
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetRADAR_final <- merge(data_id_dep_RADAR,aff_dyn_RADAR,by="ID",all=TRUE)
+names(datasetRADAR_final)
+
+
+```
+
+
+### Winzorising and transformation of skewed variables
+
+```{r RADAR transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetRADAR_final)
+
+datasetRADAR_final<-datasetRADAR_final[order(datasetRADAR_final$ID) , ]
+
+psych::describe(datasetRADAR_final)
+
+dataRADAR_finalW<-data.frame(datasetRADAR_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,5,7,8,10:15) 
+
+#winsorizing
+dataRADAR_finalW<-apply(dataRADAR_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+
+
+dataRADAR_finalW<-data.frame(dataRADAR_finalW)
+
+psych::describe(dataRADAR_finalW)               
+
+#add id number
+dataRADAR_finalW$ID <- datasetRADAR_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetRADAR_final, select=c(1:3,6,9))
+
+#Merge files
+dataRADAR_finalW <- merge(dataRADAR_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ######################
+#if skewness is > 3 (Kline, 2011)
+
+#### identifying ####
+skew<-skew(select(dataRADAR_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE]) #no transformations necessary
+
+names(dataRADAR_finalW)
+```
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+- Standardization of the depression scale
+
+```{r RADAR standardize variables, cache=FALSE}
+
+names(dataRADAR_finalW)
+
+psych::describe(dataRADAR_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(4:11)
+
+dataRADAR_finalWC<-apply(dataRADAR_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataRADAR_finalWC<-data.frame(dataRADAR_finalWC)
+
+psych::describe(dataRADAR_finalWC)               
+
+#add id number
+dataRADAR_finalWC$ID<- dataRADAR_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataRADAR_finalW, select=c(1:3,12:15))
+
+#####################Merge files #####################
+dataRADAR_finalWC <- merge(dataRADAR_finalWC,sub2,by="ID",all=TRUE)
+
+
+##################### standardize Depression #####################
+dataRADAR_finalWC$DepB<-scale(dataRADAR_finalWC$DepB, center = TRUE, scale = TRUE)
+dataRADAR_finalWC$DepF<-scale(dataRADAR_finalWC$DepF, center = TRUE, scale = TRUE)
+psych::describe(dataRADAR_finalWC)               
+
+
+names(dataRADAR_finalWC)
+
+```
+
+## DATASET 2 - SWINGING MOODS
+
+### Read in data and datapreparation
+
+```{r Swinging Moods read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset2_SM_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset2_SM_processed.csv"), sep=",",
+                                   na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset2_SM_processed$count<-calc.nomiss(PAff, ID, dataset2_SM_processed, prop=FALSE, expand=TRUE)
+range(dataset2_SM_processed$count)
+
+# exclude those with not valid daily diary data
+n_SM_orig<-nsub(ID, dataset2_SM_processed)
+n_SM_orig
+
+dataset2_SM_processed <-subset(dataset2_SM_processed, count > 0) 
+range(dataset2_SM_processed$count)
+
+n_SM_orig<-nsub(ID, dataset2_SM_processed)
+n_SM_orig
+
+
+
+
+``` 
+
+
+
+### Exclusion and Compliance
+```{r Swinging Moods Exclusion and Compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_SM<-54 
+#### Total days #### 
+tot_days_SM <- 6
+#### Total beeps per day #### 
+tot_b_d_SM<-9
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset2_SM_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+dataset2_SM_processed$perc<-(100/tot_ass_SM)*dataset2_SM_processed$count
+mean(calc.mean(perc, ID, data=dataset2_SM_processed)) 
+
+#### Number of participants before exclusion ####
+n_SM<-nsub(ID, dataset2_SM_processed)
+n_SM
+
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset2_SM_processed)
+
+## deleting ##
+dataset2_SM_processed <- check.timeinvar(NAff, ID, dataset2_SM_processed, out = 3)
+dataset2_SM_processed <- check.timeinvar(PAff, ID, dataset2_SM_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset2_SM_processed) #2 participants excluded
+
+
+#### final sample ####
+n_fin_SM<-nsub(ID, dataset2_SM_processed)
+n_fin_SM
+perc_inc_SM <- (100/n_SM_orig)*n_fin_SM
+perc_inc_SM
+
+
+
+#### mean of valid beeps per participant ####
+mean_comp_SM<-mean(calc.mean(count, ID, data=dataset2_SM_processed))  
+mean_comp_SM 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_SM<-mean(calc.mean(perc, ID, data=dataset2_SM_processed)) 
+mean_com_per_SM
+
+
+
+```
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r Swinging Moods affective dynamics dataprep, cache=FALSE}
+
+##################### Deleting rows with missings on days #####################
+#beeps were not always all sent out for all days.  
+#(later no NA's are allowed on days for the lagging of variables for the autocorrelation)
+dataset2_SM_processed<-dataset2_SM_processed[!is.na(dataset2_SM_processed$Day),]
+
+##################### sort by ID and time #####################
+dataset2_SM_processed<-dataset2_SM_processed[order(dataset2_SM_processed$ID,dataset2_SM_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset2_SM_processed_affdyn <- subset(dataset2_SM_processed, select=c("ID","time","Day","PAff","NAff"))
+
+##################### delete missing values #####################
+#Note that Swinging Moods did not have information on missing data in between beeps.
+dataset2_SM_processed_affdyn<-dataset2_SM_processed_affdyn[!is.na(dataset2_SM_processed_affdyn$PAff),]
+
+##################### make a new time variable #####################
+dataset2_SM_processed_affdyn<-dataset2_SM_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+
+dataset2_SM_processed_affdyn_NA <-insert_NA(dataset2_SM_processed_affdyn, ID, Day)
+
+```
+
+#### Calculation 
+```{r Swinging Moods affective dynamics calc, cache=FALSE}
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+aff_dyn_SM <- ddply(dataset2_SM_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountPA = sum(!is.na(PAff)),  #count of observations
+                           imeanPA  = mean(PAff, na.rm=TRUE), #imean (continuous)
+                           isdPA    = sd(PAff, na.rm=TRUE)   #isd   (continuous)  
+                           )
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset2_SM_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.PA <- ddply(dataset2_SM_processed_affdyn_NA, "ID", plyr::summarize, iMSSDPA=my.mssd(PAff))
+
+aff_dyn_SM <- merge(aff_dyn_SM,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_SM <- merge(aff_dyn_SM,mssd.stats.PA,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+## Lagged effect ##
+dataset2_SM_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset2_SM_processed_affdyn)
+dataset2_SM_processed_affdyn$PAff_lag<-lagvar(PAff, id=ID, obs=time, day=Day,data=dataset2_SM_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset2_SM_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_PA <- lmer(PAff ~ 1 + PAff_lag + (1 + PAff_lag | ID), 
+                     data = dataset2_SM_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_PA)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_PA<-tibble::rownames_to_column(coef(auto_PA)$ID)
+beta_PA<-plyr::rename(beta_PA, 
+                c("PAff_lag" = "autocorPA",
+                  "rowname" =  "ID"))
+
+##################### Merge data #####################
+aff_dyn_SM <- merge(aff_dyn_SM,beta_NA,by="ID",all=TRUE)
+aff_dyn_SM <- merge(aff_dyn_SM,beta_PA,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_SM<-subset(aff_dyn_SM, select=c(1:9,11,13))
+names(aff_dyn_SM)
+```
+
+### Merging
+
+```{r Swinging Moods merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_SM <- subset(dataset2_SM_processed, select=c("ID","Sex","Age","DepB","DepF"))
+data_id_dep_SM<-data_id_dep_SM %>% group_by(ID) %>% summarise_all(mean)
+
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetSM_final <- merge(data_id_dep_SM,aff_dyn_SM,by="ID",all=TRUE)
+names(datasetSM_final)
+
+```
+
+
+### Winzorising and transformation of skewed variables
+
+```{r Swinging Moods transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetSM_final)
+
+datasetSM_final<-datasetSM_final[order(datasetSM_final$ID) , ]
+
+psych::describe(datasetSM_final)
+
+dataSM_finalW<-data.frame(datasetSM_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,5,7,8,10:15)
+
+#winsorizing
+dataSM_finalW<-apply(dataSM_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+
+
+dataSM_finalW<-data.frame(dataSM_finalW)
+
+psych::describe(dataSM_finalW)               
+
+#add id number
+dataSM_finalW$ID <- datasetSM_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetSM_final, select=c(1:3,6,9))
+
+#Merge files
+dataSM_finalW <- merge(dataSM_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ######################
+#if skewness is > 3 (Kline, 2011)
+
+#### identifying ####
+skew<-skew(select(dataSM_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataSM_finalW)
+
+
+```
+
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+- Standardization of the depression scale
+
+```{r Swinging Moods center predictors, cache=FALSE}
+
+names(dataSM_finalW)
+
+psych::describe(dataSM_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(4:11)
+
+dataSM_finalWC<-apply(dataSM_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataSM_finalWC<-data.frame(dataSM_finalWC)
+
+psych::describe(dataSM_finalWC)               
+
+#add id number
+dataSM_finalWC$ID<- dataSM_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataSM_finalW, select=c(1:3,12:15))
+
+#Merge files
+dataSM_finalWC <- merge(dataSM_finalWC,sub2,by="ID",all=TRUE)
+
+##################### standardize Depression #####################
+dataSM_finalWC$DepB<-scale(dataSM_finalWC$DepB, center = TRUE, scale = TRUE)
+dataSM_finalWC$DepF<-scale(dataSM_finalWC$DepF, center = TRUE, scale = TRUE)
+psych::describe(dataSM_finalWC)
+
+names(dataSM_finalWC)
+
+
+```
+
+
+## DATASET 3 - MOOD IN EMERGING ADULTS
+
+### Read in data and datapreparation
+```{r Mood in Emerging Adults read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset3_MA_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset3_MA_processed.csv"), sep=",",
+                                na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset3_MA_processed$count<-calc.nomiss(PAff, ID, dataset3_MA_processed, prop=FALSE, expand=TRUE)
+range(dataset3_MA_processed$count)
+
+# exclude those with not valid daily diary data
+n_MA_orig<-nsub(ID, dataset3_MA_processed)
+n_MA_orig
+
+dataset3_MA_processed <-subset(dataset3_MA_processed, count > 0) 
+range(dataset3_MA_processed$count)
+
+n_MA_orig<-nsub(ID, dataset3_MA_processed)
+n_MA_orig
+
+
+```
+
+
+### Exclusion and Compliance
+```{r Mood in Emerging Adults Exclusion and Compliance, cache=FALSE}
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_MA<-55
+#### Total days ####
+tot_days_MA <-11 
+#### Total beeps per day ####
+tot_b_d_MA<-5
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset3_MA_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+dataset3_MA_processed$perc<-(100/tot_ass_MA)*dataset3_MA_processed$count
+mean(calc.mean(perc, ID, data=dataset3_MA_processed)) 
+
+#### Number of participants before exclusion ####
+n_MA<-nsub(ID, dataset3_MA_processed)
+n_MA
+
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset3_MA_processed)
+
+#### Delete participants without any variance on NAff and PAff ####
+dataset3_MA_processed <- check.timeinvar(NAff, ID, dataset3_MA_processed, out = 3)
+dataset3_MA_processed <- check.timeinvar(PAff, ID, dataset3_MA_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset3_MA_processed) #no participants excluded
+
+
+#### final sample ####
+n_fin_MA<-nsub(ID, dataset3_MA_processed)
+n_fin_MA
+perc_inc_MA <- (100/n_MA_orig)*n_fin_MA
+perc_inc_MA
+
+
+
+#### mean of valid beeps per participant ####
+mean_comp_MA<-mean(calc.mean(count, ID, data=dataset3_MA_processed)) 
+mean_comp_MA 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_MA<-mean(calc.mean(perc, ID, data=dataset3_MA_processed)) 
+mean_com_per_MA
+
+
+
+
+```
+
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r Mood in Emerging Adults affective dynamics dataprep, cache=FALSE}
+##################### Deleting rows with missings on days ##################### 
+#beeps were not always all sent out for all days.   
+#(later no NA's are allowed on days for the lagging of variables for the autocorrelation)
+dataset3_MA_processed<-dataset3_MA_processed[!is.na(dataset3_MA_processed$Day),]
+
+##################### sort by ID and time #####################
+dataset3_MA_processed<-dataset3_MA_processed[order(dataset3_MA_processed$ID,dataset3_MA_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset3_MA_processed_affdyn <- subset(dataset3_MA_processed, select=c("ID","time","Day","PAff","NAff"))
+
+##################### delete missing values ##################### 
+#Note that Mood in Emerging Adults did not have information on missing data in between beeps.
+dataset3_MA_processed_affdyn<-dataset3_MA_processed_affdyn[!is.na(dataset3_MA_processed_affdyn$PAff),]
+
+##################### make a new time variable #####################
+dataset3_MA_processed_affdyn<-dataset3_MA_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+dataset3_MA_processed_affdyn_NA <-insert_NA(dataset3_MA_processed_affdyn, ID, Day)
+
+
+
+```
+
+#### Calculation 
+```{r Mood in Emerging Adults affective dynamics calc, cache=FALSE}
+
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+
+aff_dyn_MA <- ddply(dataset3_MA_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountPA = sum(!is.na(PAff)),  #count of observations
+                           imeanPA  = mean(PAff, na.rm=TRUE), #imean (continuous)
+                           isdPA    = sd(PAff, na.rm=TRUE)   #isd   (continuous)  
+                           )
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset3_MA_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.PA <- ddply(dataset3_MA_processed_affdyn_NA, "ID", plyr::summarize, iMSSDPA=my.mssd(PAff))
+
+aff_dyn_MA <- merge(aff_dyn_MA,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_MA <- merge(aff_dyn_MA,mssd.stats.PA,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+## Lagged effect ##
+
+dataset3_MA_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset3_MA_processed_affdyn)
+dataset3_MA_processed_affdyn$PAff_lag<-lagvar(PAff, id=ID, obs=time, day=Day,data=dataset3_MA_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset3_MA_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_PA <- lmer(PAff ~ 1 + PAff_lag + (1 + PAff_lag | ID), 
+                     data = dataset3_MA_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_PA)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_PA<-tibble::rownames_to_column(coef(auto_PA)$ID)
+beta_PA<-plyr::rename(beta_PA, 
+                c("PAff_lag" = "autocorPA",
+                  "rowname" =  "ID"))
+
+##################### Merge data #####################
+aff_dyn_MA <- merge(aff_dyn_MA,beta_NA,by="ID",all=TRUE)
+aff_dyn_MA <- merge(aff_dyn_MA,beta_PA,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_MA<-subset(aff_dyn_MA, select=c(1:9,11,13))
+names(aff_dyn_MA)
+
+```
+
+
+### Merging
+
+```{r Mood in Emerging Adults merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_MA <- subset(dataset3_MA_processed, select=c("ID","Sex","Age","DepB","DepF"))
+data_id_dep_MA<-data_id_dep_MA %>% group_by(ID) %>% summarise_all(mean)
+
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetMA_final <- merge(data_id_dep_MA,aff_dyn_MA,by="ID",all=TRUE)
+names(datasetMA_final)
+
+```
+
+### Winzorising and transformation of skewed variables
+
+```{r Mood in Emerging Adults transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetMA_final)
+
+datasetMA_final<-datasetMA_final[order(datasetMA_final$ID) , ]
+
+psych::describe(datasetMA_final)
+
+dataMA_finalW<-data.frame(datasetMA_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,5,7,8,10:15)
+
+#winsorizing
+dataMA_finalW<-apply(dataMA_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+
+
+dataMA_finalW<-data.frame(dataMA_finalW)
+
+psych::describe(dataMA_finalW)               
+
+#add id number
+dataMA_finalW$ID <- datasetMA_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetMA_final, select=c(1:3,6,9))
+
+#Merge files
+dataMA_finalW <- merge(dataMA_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ###################### 
+#if skewness is > 3 (Kline, 2011)
+#### identifying ####
+skew<-skew(select(dataMA_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataMA_finalW)
+
+
+
+```
+
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+- Standardization of the depression scale
+
+```{r Mood in Emerging Adults center predictors, cache=FALSE}
+
+names(dataMA_finalW)
+
+psych::describe(dataMA_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(4:11)
+
+dataMA_finalWC<-apply(dataMA_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataMA_finalWC<-data.frame(dataMA_finalWC)
+
+psych::describe(dataMA_finalWC)               
+
+#add id number
+dataMA_finalWC$ID<- dataMA_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataMA_finalW, select=c(1:3,12:15))
+
+#Merge files
+dataMA_finalWC <- merge(dataMA_finalWC,sub2,by="ID",all=TRUE)
+
+##################### standardize Depression #####################
+dataMA_finalWC$DepB<-scale(dataMA_finalWC$DepB, center = TRUE, scale = TRUE)
+dataMA_finalWC$DepF<-scale(dataMA_finalWC$DepF, center = TRUE, scale = TRUE)
+psych::describe(dataMA_finalWC)
+
+names(dataMA_finalWC)
+
+```
+
+
+## DATASET 4: EMOTIONS IN DAILY LIFE
+
+### Read in data and datapreparation
+
+```{r Emotions in daily life read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset4_ED_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset4_ED_processed.csv"), sep=",",
+                                na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset4_ED_processed$count<-calc.nomiss(PAff, ID, dataset4_ED_processed, prop=FALSE, expand=TRUE)
+range(dataset4_ED_processed$count)
+
+# exclude those with not valid daily diary data
+n_ED_orig<-nsub(ID, dataset4_ED_processed)
+n_ED_orig
+
+dataset4_ED_processed <-subset(dataset4_ED_processed, count > 0) 
+range(dataset4_ED_processed$count)
+
+n_ED_orig<-nsub(ID, dataset4_ED_processed)
+n_ED_orig
+
+
+```
+
+
+### Exclusion and Compliance
+```{r Emotions in Daily Life Exclusion and Compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_ED<-70
+#### Total days ####
+tot_days_ED <- 14
+#### Total beeps per day ####
+tot_b_d_ED<-5
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset4_ED_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+dataset4_ED_processed$perc<-(100/tot_ass_ED)*dataset4_ED_processed$count
+mean(calc.mean(perc, ID, data=dataset4_ED_processed)) 
+
+#### Number of participants before exclusion ####
+n_ED<-nsub(ID, dataset4_ED_processed)
+n_ED
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset4_ED_processed)
+
+#### Delete participants without any variance on NAff and PAff ####
+dataset4_ED_processed <- check.timeinvar(NAff, ID, dataset4_ED_processed, out = 3)
+dataset4_ED_processed <- check.timeinvar(PAff, ID, dataset4_ED_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset4_ED_processed) #no participant excluded
+
+
+#### final sample ####
+n_fin_ED<-nsub(ID, dataset4_ED_processed)
+n_fin_ED
+perc_inc_ED <- (100/n_ED_orig)*n_fin_ED
+perc_inc_ED
+
+
+
+#### mean of valid beeps per participant ####
+mean_comp_ED<-mean(calc.mean(count, ID, data=dataset4_ED_processed)) 
+mean_comp_ED 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_ED<-mean(calc.mean(perc, ID, data=dataset4_ED_processed)) 
+mean_com_per_ED
+
+
+```
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r Emotions in daily life number affective dynamics dataprep, cache=FALSE}
+
+##################### Deleting rows with missings on days #####################
+#(later no NA's are allowed on days for the lagging of variables for the autocorrelation)
+dataset4_ED_processed<-dataset4_ED_processed[!is.na(dataset4_ED_processed$Day),]
+
+##################### sort by ID and time #####################
+dataset4_ED_processed<-dataset4_ED_processed[order(dataset4_ED_processed$ID,dataset4_ED_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset4_ED_processed_affdyn <- subset(dataset4_ED_processed, select=c("ID","time","Day","PAff","NAff"))
+
+##################### delete missing values ##################### 
+#so that differences are also calculated between beeps that were
+#not directly next to each other (e.g., 3, 4(NA), 5) 
+#I still want to calculate the difference between 3 and 5
+dataset4_ED_processed_affdyn<-dataset4_ED_processed_affdyn[!is.na(dataset4_ED_processed_affdyn$PAff),]
+
+##################### make a new time variable #####################
+
+
+dataset4_ED_processed_affdyn<-dataset4_ED_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+dataset4_ED_processed_affdyn_NA <-insert_NA(dataset4_ED_processed_affdyn, ID, Day)
+
+
+```
+
+
+
+
+#### Calculation 
+```{r Emotions in daily life affective dynamics calc, cache=FALSE}
+
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+
+aff_dyn_ED <- ddply(dataset4_ED_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountPA = sum(!is.na(PAff)),  #count of observations
+                           imeanPA  = mean(PAff, na.rm=TRUE), #imean (continuous)
+                           isdPA    = sd(PAff, na.rm=TRUE)   #isd   (continuous)  
+                           )
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset4_ED_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.PA <- ddply(dataset4_ED_processed_affdyn_NA, "ID", plyr::summarize, iMSSDPA=my.mssd(PAff))
+
+aff_dyn_ED <- merge(aff_dyn_ED,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_ED <- merge(aff_dyn_ED,mssd.stats.PA,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+## Lagged effect ##
+
+dataset4_ED_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset4_ED_processed_affdyn)
+dataset4_ED_processed_affdyn$PAff_lag<-lagvar(PAff, id=ID, obs=time, day=Day,data=dataset4_ED_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset4_ED_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_PA <- lmer(PAff ~ 1 + PAff_lag + (1 + PAff_lag | ID), 
+                     data = dataset4_ED_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_PA)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_PA<-tibble::rownames_to_column(coef(auto_PA)$ID)
+beta_PA<-plyr::rename(beta_PA, 
+                c("PAff_lag" = "autocorPA",
+                  "rowname" =  "ID"))
+
+##################### Merge data #####################
+aff_dyn_ED <- merge(aff_dyn_ED,beta_NA,by="ID",all=TRUE)
+aff_dyn_ED <- merge(aff_dyn_ED,beta_PA,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_ED<-subset(aff_dyn_ED, select=c(1:9,11,13))
+names(aff_dyn_ED)
+```
+### Merging
+
+```{r Emotions in daily life merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_ED <- subset(dataset4_ED_processed, select=c("ID","Sex","Age","DepB"))
+data_id_dep_ED<-data_id_dep_ED %>% group_by(ID) %>% summarise_all(mean)
+
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetED_final <- merge(data_id_dep_ED,aff_dyn_ED,by="ID",all=TRUE)
+names(datasetED_final)
+
+```
+
+
+
+
+### Winzorising and transformation of skewed variables
+
+```{r Emotions in daily life transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetED_final)
+
+datasetED_final<-datasetED_final[order(datasetED_final$ID) , ]
+
+psych::describe(datasetED_final)
+
+dataED_finalW<-data.frame(datasetED_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,6,7,9:14)
+
+#winsorizing
+dataED_finalW<-apply(dataED_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+dataED_finalW<-data.frame(dataED_finalW)
+
+psych::describe(dataED_finalW)               
+
+#add id number
+dataED_finalW$ID <- datasetED_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetED_final, select=c(1:3,5,8))
+
+#Merge files
+dataED_finalW <- merge(dataED_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ###################### 
+#if skewness is > 3 (Kline, 2011)
+#### identifying ####
+skew<-skew(select(dataED_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataED_finalW)
+
+```
+
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+- Standardization of the depression scale
+
+```{r Emotions in daily life center predictors, cache=FALSE}
+
+names(dataED_finalW)
+
+psych::describe(dataED_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(3:10)
+
+dataED_finalWC<-apply(dataED_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataED_finalWC<-data.frame(dataED_finalWC)
+
+psych::describe(dataED_finalWC)               
+
+#add id number
+dataED_finalWC$ID<- dataED_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataED_finalW, select=c(1:2,11:14))
+
+#Merge files
+dataED_finalWC <- merge(dataED_finalWC,sub2,by="ID",all=TRUE)
+
+##################### standardize Depression #####################
+dataED_finalWC$DepB<-scale(dataED_finalWC$DepB, center = TRUE, scale = TRUE)
+psych::describe(dataED_finalWC)
+
+
+names(dataED_finalWC)
+
+```
+
+
+
+## DATASET 5: EMOTION REGULATION IN ACTION
+
+### Read in data and datapreparation
+
+```{r Emotion regulation in action read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset5_EA_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset5_EA_processed.csv"), sep=",",
+                                na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset5_EA_processed$count<-calc.nomiss(PAff, ID, dataset5_EA_processed, prop=FALSE, expand=TRUE)
+range(dataset5_EA_processed$count)
+
+# exclude those with not valid daily diary data
+n_EA_orig<-nsub(ID, dataset5_EA_processed)
+n_EA_orig
+
+dataset5_EA_processed <-subset(dataset5_EA_processed, count > 0) 
+range(dataset5_EA_processed$count)
+
+n_EA_orig<-nsub(ID, dataset5_EA_processed)
+n_EA_orig
+
+```
+
+### Exclusion and Compliance
+```{r Emotion regulation in action exclusion and compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_EA<-44
+#### Total days #### (2 Fridays, 2 Saturdays, 2 Sundays)
+tot_days_EA <- 6
+#### Total beeps per day ####
+tot_b_d_EA_F<-4 #Friday
+tot_b_d_EA_SS<-9 #Saturday/Sunday
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset5_EA_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+possassEA<-tot_ass_EA*n_EA_orig #possible assessments
+validassEA<-sum(calc.mean(count, ID, data=dataset5_EA_processed)) #number of all valid assessments
+((100/possassEA)*validassEA) #percentage of valid beeps
+
+dataset5_EA_processed$perc<-(100/tot_ass_EA)*dataset5_EA_processed$count
+mean(calc.mean(perc, ID, data=dataset5_EA_processed)) 
+
+#### Number of participants before exclusion ####
+n_EA<-nsub(ID, dataset5_EA_processed)
+n_EA
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset5_EA_processed)
+
+#### Delete participants without any variance on NAff and PAff ####
+dataset5_EA_processed <- check.timeinvar(NAff, ID, dataset5_EA_processed, out = 3)
+dataset5_EA_processed <- check.timeinvar(PAff, ID, dataset5_EA_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset5_EA_processed) #no participants excluded
+
+#### final sample ####
+n_fin_EA<-nsub(ID, dataset5_EA_processed)
+n_fin_EA
+perc_inc_EA <- (100/n_EA_orig)*n_fin_EA
+perc_inc_EA
+
+
+
+#### mean of valid beeps per participant ####
+mean_comp_EA<-mean(calc.mean(count, ID, data=dataset5_EA_processed)) 
+mean_comp_EA 
+
+#### percentage of valid beeps per participant ####
+validassEA<-sum(calc.mean(count, ID, data=dataset5_EA_processed)) #number of all valid assessments
+mean_com_per_EA<-((100/possassEA)*validassEA) #percentage of valid beeps
+mean_com_per_EA
+
+```
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r Emotion regulation in action number affective dynamics dataprep, cache=FALSE}
+
+##################### sort by ID and time #####################
+dataset5_EA_processed<-dataset5_EA_processed[order(dataset5_EA_processed$ID,dataset5_EA_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset5_EA_processed_affdyn <- subset(dataset5_EA_processed, select=c("ID","time","Day","PAff","NAff"))
+
+##################### delete missing values ##################### 
+#Note that Emotion regulation in action did not have information on missing data in between beeps.
+dataset5_EA_processed_affdyn<-dataset5_EA_processed_affdyn[!is.na(dataset5_EA_processed_affdyn$PAff),]
+
+##################### make a new time variable #####################
+
+
+dataset5_EA_processed_affdyn<-dataset5_EA_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+dataset5_EA_processed_affdyn_NA <-insert_NA(dataset5_EA_processed_affdyn, ID, Day)
+
+
+
+```
+
+
+
+#### Calculation 
+```{r Emotion regulation in action affective dynamics calc, cache=FALSE}
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+
+aff_dyn_EA <- ddply(dataset5_EA_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountPA = sum(!is.na(PAff)),  #count of observations
+                           imeanPA  = mean(PAff, na.rm=TRUE), #imean (continuous)
+                           isdPA    = sd(PAff, na.rm=TRUE)   #isd   (continuous)  
+                           )
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset5_EA_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.PA <- ddply(dataset5_EA_processed_affdyn_NA, "ID", plyr::summarize, iMSSDPA=my.mssd(PAff))
+
+aff_dyn_EA <- merge(aff_dyn_EA,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_EA <- merge(aff_dyn_EA,mssd.stats.PA,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+## Lagged effect ##
+
+dataset5_EA_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset5_EA_processed_affdyn)
+dataset5_EA_processed_affdyn$PAff_lag<-lagvar(PAff, id=ID, obs=time, day=Day,data=dataset5_EA_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset5_EA_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_PA <- lmer(PAff ~ 1 + PAff_lag + (1 + PAff_lag | ID), 
+                     data = dataset5_EA_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_PA)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_PA<-tibble::rownames_to_column(coef(auto_PA)$ID)
+beta_PA<-plyr::rename(beta_PA, 
+                c("PAff_lag" = "autocorPA",
+                  "rowname" =  "ID"))
+
+##################### Merge data #####################
+aff_dyn_EA <- merge(aff_dyn_EA,beta_NA,by="ID",all=TRUE)
+aff_dyn_EA <- merge(aff_dyn_EA,beta_PA,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_EA<-subset(aff_dyn_EA, select=c(1:9,11,13))
+names(aff_dyn_EA)
+
+```
+### Merging
+
+```{r Emotion regulation in action merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_EA <- subset(dataset5_EA_processed, select=c("ID","Sex","Age","DepB"))
+data_id_dep_EA<-data_id_dep_EA %>% group_by(ID) %>% summarise_all(mean)
+
+length(data_id_dep_EA$ID)
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetEA_final <- merge(data_id_dep_EA,aff_dyn_EA,by="ID",all=TRUE)
+names(datasetEA_final)
+
+```
+
+
+
+### Winzorising and transformation of skewed variables
+
+```{r Emotion regulation in action transformation + winsorizing, cache=FALSE}
+##################### winsorizing #####################
+names(datasetEA_final)
+
+datasetEA_final<-datasetEA_final[order(datasetEA_final$ID) , ]
+
+psych::describe(datasetEA_final)
+
+dataEA_finalW<-data.frame(datasetEA_final)
+
+predictor_wins<-c(4,6,7,9:14)
+
+dataEA_finalW<-apply(dataEA_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+dataEA_finalW<-data.frame(dataEA_finalW)
+
+psych::describe(dataEA_finalW)               
+
+#add id number
+dataEA_finalW$ID <- datasetEA_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetEA_final, select=c(1:3,5,8))
+
+#Merge files
+dataEA_finalW <- merge(dataEA_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ###################### 
+#if skewness is > 3 (Kline, 2011)
+#### identifying ####
+skew<-skew(select(dataEA_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataEA_finalW)
+
+
+```
+
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+- Standardization of the depression scale
+
+```{r Emotion regulation in action center predictors, cache=FALSE}
+
+names(dataEA_finalW)
+
+psych::describe(dataEA_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(3:10)
+
+dataEA_finalWC<-apply(dataEA_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataEA_finalWC<-data.frame(dataEA_finalWC)
+
+psych::describe(dataEA_finalWC)               
+
+#add id number
+dataEA_finalWC$ID<- dataEA_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataEA_finalW, select=c(1:2,11:14))
+
+#Merge files
+dataEA_finalWC <- merge(dataEA_finalWC,sub2,by="ID",all=TRUE)
+
+names(dataEA_finalWC)
+
+##################### standardize Depression #####################
+dataEA_finalWC$DepB<-scale(dataEA_finalWC$DepB, center = TRUE, scale = TRUE)
+psych::describe(dataEA_finalWC)
+
+```
+
+
+## DATASET 6: LASER
+
+For the LASER dataset, there were only 2 emotion items assessed. First, participants had to rate their overall mood on a scale from -10 to +10 (very negative to very positive). This is what is referred to as Bipolar Affect in this paper (BA). Second, participants had to rate only their most negative emotion (selected from sadness, anger and anxiety). 
+
+
+Given that there is only 1 items for NA, we cannot calculate MCFA's and alpha and omega. We can calculate the ICCs.
+
+
+### Read in data and datapreparation
+
+```{r LASER read in data, cache=FALSE}
+####################### Read in data #######################
+dataset6_LASER_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset6_LASER_processed.csv"), sep=",",
+                                na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset6_LASER_processed$count<-calc.nomiss(NAff, ID, dataset6_LASER_processed, prop=FALSE, expand=TRUE)
+range(dataset6_LASER_processed$count)
+
+# exclude those with not valid daily diary data
+n_LASER_orig<-nsub(ID, dataset6_LASER_processed)
+n_LASER_orig
+
+dataset6_LASER_processed <-subset(dataset6_LASER_processed, count > 0) 
+range(dataset6_LASER_processed$count)
+
+n_LASER_orig<-nsub(ID, dataset6_LASER_processed)
+n_LASER_orig
+
+```
+
+### Exclusion and Compliance
+```{r LASER exclusion and compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_LASER<-42
+#### Total days ####
+tot_days_LASER <- 14
+#### Total beeps per day ####
+tot_b_d_LASER<-3
+
+#### Number of valid beeps before exclusion ####
+mean(calc.mean(count, ID, data=dataset6_LASER_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+dataset6_LASER_processed$perc<-(100/tot_ass_LASER)*dataset6_LASER_processed$count
+mean(calc.mean(perc, ID, data=dataset6_LASER_processed)) 
+
+#### Number of participants before exclusion ####
+n_LASER<-nsub(ID, dataset6_LASER_processed)
+n_LASER
+
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset6_LASER_processed)
+
+#### Delete participants without any variance on NAff and PAff ####
+dataset6_LASER_processed <- check.timeinvar(NAff, ID, dataset6_LASER_processed, out = 3)
+dataset6_LASER_processed <- check.timeinvar(Bip_aff, ID, dataset6_LASER_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset6_LASER_processed) #no participants excluded
+
+
+#### final sample ####
+n_fin_LASER<-nsub(ID, dataset6_LASER_processed)
+n_fin_LASER
+perc_inc_LASER <- (100/n_LASER_orig)*n_fin_LASER
+perc_inc_LASER
+
+
+
+#### mean of valid beeps per participant ####
+mean_comp_LASER<-mean(calc.mean(count, ID, data=dataset6_LASER_processed)) 
+mean_comp_LASER 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_LASER<-mean(calc.mean(perc, ID, data=dataset6_LASER_processed)) 
+mean_com_per_LASER
+
+
+
+
+```
+
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r LASER number affective dynamics dataprep, cache=FALSE}
+
+##################### sort by ID and time #####################
+dataset6_LASER_processed<-dataset6_LASER_processed[order(dataset6_LASER_processed$ID,dataset6_LASER_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset6_LASER_processed_affdyn <- subset(dataset6_LASER_processed, select=c("ID","time","Day","NAff","Bip_aff"))
+
+##################### delete missing values ##################### 
+#so that differences are also calculated between beeps that were
+#not directly next to each other (e.g., 3, 4(NA), 5) 
+#I still want to calculate the difference between 3 and 5
+dataset6_LASER_processed_affdyn<-dataset6_LASER_processed_affdyn[!is.na(dataset6_LASER_processed_affdyn$NAff),]
+
+##################### make a new time variable #####################
+dataset6_LASER_processed_affdyn<-dataset6_LASER_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+
+dataset6_LASER_processed_affdyn_NA <-insert_NA(dataset6_LASER_processed_affdyn, ID, Day)
+
+
+```
+
+#### Calculation 
+```{r LASER affective dynamics calc, cache=FALSE}
+
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+aff_dyn_LASER <- ddply(dataset6_LASER_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountBip = sum(!is.na(Bip_aff)),  #count of observations
+                           imeanBip_aff  = mean(Bip_aff, na.rm=TRUE), #imean (continuous)
+                           isdBip_aff   = sd(Bip_aff, na.rm=TRUE) #isd (continuous)
+                           )
+
+
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset6_LASER_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.Bip_aff <- ddply(dataset6_LASER_processed_affdyn_NA, "ID", plyr::summarize, iMSSDBip_aff=my.mssd(Bip_aff))
+
+aff_dyn_LASER <- merge(aff_dyn_LASER,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_LASER <- merge(aff_dyn_LASER,mssd.stats.Bip_aff,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+
+## Lagged effect ##
+
+dataset6_LASER_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset6_LASER_processed_affdyn)
+dataset6_LASER_processed_affdyn$Bip_aff_lag<-lagvar(Bip_aff, id=ID, obs=time, day=Day,data=dataset6_LASER_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset6_LASER_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_Bip_aff <- lmer(Bip_aff ~ 1 + Bip_aff_lag + (1 + Bip_aff_lag | ID), 
+                     data = dataset6_LASER_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_Bip_aff)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_Bip_aff<-tibble::rownames_to_column(coef(auto_Bip_aff)$ID)
+beta_Bip_aff<-plyr::rename(beta_Bip_aff, 
+                c("Bip_aff_lag" = "autocorBip_aff",
+                  "rowname" =  "ID"))
+
+
+##################### Merge data #####################
+aff_dyn_LASER <- merge(aff_dyn_LASER,beta_NA,by="ID",all=TRUE)
+aff_dyn_LASER <- merge(aff_dyn_LASER,beta_Bip_aff,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_LASER<-subset(aff_dyn_LASER, select=c(1:9,11,13))
+names(aff_dyn_LASER)
+
+```
+### Merging
+
+```{r LASER merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_LASER <- subset(dataset6_LASER_processed, select=c("ID","Sex","Age","DepB"))
+data_id_dep_LASER<-data_id_dep_LASER %>% group_by(ID) %>% summarise_all(mean)
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetLASER_final <- merge(data_id_dep_LASER,aff_dyn_LASER,by="ID",all=TRUE)
+names(datasetLASER_final)
+
+```
+
+
+### Winzorising and transformation of skewed variables
+
+```{r LASER transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetLASER_final)
+
+datasetLASER_final<-datasetLASER_final[order(datasetLASER_final$ID) , ]
+
+psych::describe(datasetLASER_final)
+
+dataLASER_finalW<-data.frame(datasetLASER_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,6,7,9:14)
+
+#winsorizing
+dataLASER_finalW<-apply(dataLASER_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+dataLASER_finalW<-data.frame(dataLASER_finalW)
+
+psych::describe(dataLASER_finalW)               
+
+#add id number
+dataLASER_finalW$ID <- datasetLASER_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetLASER_final, select=c(1:3,5,8))
+
+#Merge files
+dataLASER_finalW <- merge(dataLASER_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ###################### 
+#if skewness is > 3 (Kline, 2011)
+#### identifying ####
+skew<-skew(select(dataLASER_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataLASER_finalW)
+
+
+```
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+
+- Standardization of the depression scale
+
+```{r LASER center predictors, cache=FALSE}
+
+names(dataLASER_finalW)
+
+psych::describe(dataLASER_finalW)
+
+##################### center predictors #####################
+predictor_scale<-c(3:10)
+
+dataLASER_finalWC<-apply(dataLASER_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataLASER_finalWC<-data.frame(dataLASER_finalWC)
+
+psych::describe(dataLASER_finalWC)               
+
+#add id number
+dataLASER_finalWC$ID<- dataLASER_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataLASER_finalW, select=c(1:2,11:14))
+
+#Merge files
+dataLASER_finalWC <- merge(dataLASER_finalWC,sub2,by="ID",all=TRUE)
+
+##################### standardize Depression #####################
+dataLASER_finalWC$DepB<-scale(dataLASER_finalWC$DepB, center = TRUE, scale = TRUE)
+psych::describe(dataLASER_finalWC)
+
+names(dataLASER_finalWC)
+
+```
+
+
+
+## DATASET 7: YES
+
+For the YES dataset, there were only 2 emotion items assessed. First, participants had to rate their overall mood on a scale from -10 to +10 (very negative to very positive). This is what is referred to as Bipolar Affect in this paper (BA). Second, participants had to rate only their most negative emotion (selected from sadness, anger and anxiety). 
+
+
+Given that there is only 1 items for NA, we cannot calculate MCFA's and alpha and omega. We can calculate the ICCs.
+
+### Read in data and datapreparation
+
+```{r YES read in data, cache=FALSE}
+
+####################### Read in data #######################
+dataset7_YES_processed<-read.csv(here::here("data", "2_processed_data_for_OSF", "dataset7_YES_processed.csv"), sep=",",
+                                na.strings="NA")
+
+####################### number of participants with valid ESM data ##################### 
+dataset7_YES_processed$count<-calc.nomiss(NAff, ID, dataset7_YES_processed, prop=FALSE, expand=TRUE)
+range(dataset7_YES_processed$count)
+
+# exclude those with not valid daily diary data
+n_YES_orig<-nsub(ID, dataset7_YES_processed)
+n_YES_orig
+
+dataset7_YES_processed <-subset(dataset7_YES_processed, count > 0) 
+range(dataset7_YES_processed$count)
+
+n_YES_orig<-nsub(ID, dataset7_YES_processed)
+n_YES_orig
+
+```
+
+### Exclusion and Compliance
+```{r YES exclusion and compliance, cache=FALSE}
+
+##################### Details study design #####################
+#### Total beeps ####
+tot_ass_YES<-42
+#### Total days ####
+tot_days_YES <- 14
+#### Total beeps per day ####
+tot_b_d_YES<-3
+
+#### Number of valid beeps before exclusion #### 
+mean(calc.mean(count, ID, data=dataset7_YES_processed)) 
+
+#### Percentage of valid beeps before exclusion #### 
+dataset7_YES_processed$perc<-(100/tot_ass_YES)*dataset7_YES_processed$count
+mean(calc.mean(perc, ID, data=dataset7_YES_processed)) 
+
+#### Number of participants before exclusion ####
+n_YES<-nsub(ID, dataset7_YES_processed)
+n_YES
+
+
+
+
+#### Delete participants without any variance on NAff and PAff ####
+## n before ##
+nsub(ID, dataset7_YES_processed)
+
+#### Delete participants without any variance on NAff and PAff ####
+dataset7_YES_processed <- check.timeinvar(NAff, ID, dataset7_YES_processed, out = 3)
+dataset7_YES_processed <- check.timeinvar(Bip_aff, ID, dataset7_YES_processed, out = 3)
+
+## n after ##
+nsub(ID, dataset7_YES_processed) #1 participant excluded
+
+#### final sample ####
+n_fin_YES<-nsub(ID, dataset7_YES_processed)
+n_fin_YES
+perc_inc_YES <- (100/n_YES_orig)*n_fin_YES
+perc_inc_YES
+
+#### mean of valid beeps per participant ####
+mean_comp_YES<-mean(calc.mean(count, ID, data=dataset7_YES_processed)) 
+mean_comp_YES 
+
+#### percentage of valid beeps per participant ####
+mean_com_per_YES<-mean(calc.mean(perc, ID, data=dataset7_YES_processed)) 
+mean_com_per_YES
+
+
+```
+
+
+### Calculation of affective dynamics
+
+#### Datapreparation
+
+```{r YES number affective dynamics dataprep, cache=FALSE}
+
+##################### Deleting rows with missings on days #####################
+#There were some rows with missing on days and also affect. Those were deleted
+dataset7_YES_processed<-dataset7_YES_processed[!is.na(dataset7_YES_processed$Day),]
+
+##################### sort by ID and time #####################
+dataset7_YES_processed<-dataset7_YES_processed[order(dataset7_YES_processed$ID,dataset7_YES_processed$time) , ]
+
+##################### subset most important variables #####################
+dataset7_YES_processed_affdyn <- subset(dataset7_YES_processed, select=c("ID","time","Day","NAff","Bip_aff"))
+
+##################### delete missing values ##################### 
+#so that differences are also calculated between beeps that were
+#not directly next to each other (e.g., 3, 4(NA), 5) 
+#I still want to calculate the difference between 3 and 5
+dataset7_YES_processed_affdyn<-dataset7_YES_processed_affdyn[!is.na(dataset7_YES_processed_affdyn$NAff),]
+
+##################### make a new time variable #####################
+dataset7_YES_processed_affdyn<-dataset7_YES_processed_affdyn %>% group_by(ID) %>% dplyr::mutate(time = rank(time, ties.method = 'first'))%>% arrange(time)
+
+##################### add missing days after each week ##################### 
+#this is important, because for the MSSD, we do not want to calculate the
+#difference between the last beep of one day and the first beep of the next day/week
+dataset7_YES_processed_affdyn_NA <-insert_NA(dataset7_YES_processed_affdyn, ID, Day)
+
+
+```
+
+#### Calculation 
+```{r YES affective dynamics calc, cache=FALSE}
+
+
+##################### Calculate affective dynamics #####################
+#### Mean, SD ####
+
+aff_dyn_YES <- ddply(dataset7_YES_processed_affdyn_NA, "ID",  plyr::summarize,
+                           icountNA = sum(!is.na(NAff)),  #count of observations
+                           imeanNA  = mean(NAff, na.rm=TRUE), #imean (continuous)
+                           isdNA   = sd(NAff, na.rm=TRUE), #isd (continuous)
+                           icountBip = sum(!is.na(Bip_aff)),  #count of observations
+                           imeanBip_aff  = mean(Bip_aff, na.rm=TRUE), #imean (continuous)
+                           isdBip_aff   = sd(Bip_aff, na.rm=TRUE) #isd (continuous)
+                           )
+
+
+#### MSSD ####
+
+mssd.stats.NA <- ddply(dataset7_YES_processed_affdyn_NA, "ID", plyr::summarize, iMSSDNA=my.mssd(NAff))
+mssd.stats.Bip_aff <- ddply(dataset7_YES_processed_affdyn_NA, "ID", plyr::summarize, iMSSDBip_aff=my.mssd(Bip_aff))
+
+aff_dyn_YES <- merge(aff_dyn_YES,mssd.stats.NA,by="ID",all=TRUE)
+aff_dyn_YES <- merge(aff_dyn_YES,mssd.stats.Bip_aff,by="ID",all=TRUE)
+
+
+#### autocorrelation ####
+
+
+## Lagged effect ##
+
+dataset7_YES_processed_affdyn$NAff_lag<-lagvar(NAff, id=ID, obs=time, day=Day,data=dataset7_YES_processed_affdyn)
+dataset7_YES_processed_affdyn$Bip_aff_lag<-lagvar(Bip_aff, id=ID, obs=time, day=Day,data=dataset7_YES_processed_affdyn)
+
+## Mixed model ##
+auto_NA <- lmer(NAff ~ 1 + NAff_lag + (1 + NAff_lag | ID), 
+                     data = dataset7_YES_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_NA)
+
+auto_Bip_aff <- lmer(Bip_aff ~ 1 + Bip_aff_lag + (1 + Bip_aff_lag | ID), 
+                     data = dataset7_YES_processed_affdyn, REML = TRUE,
+                     control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb')))
+summary(auto_Bip_aff)
+
+## Extract individual slopes ##
+beta_NA<-tibble::rownames_to_column(coef(auto_NA)$ID)
+beta_NA<-plyr::rename(beta_NA, 
+                c("NAff_lag" = "autocorNA",
+                  "rowname" =  "ID"))
+
+beta_Bip_aff<-tibble::rownames_to_column(coef(auto_Bip_aff)$ID)
+beta_Bip_aff<-plyr::rename(beta_Bip_aff, 
+                c("Bip_aff_lag" = "autocorBip_aff",
+                  "rowname" =  "ID"))
+
+##################### Merge data #####################
+aff_dyn_YES <- merge(aff_dyn_YES,beta_NA,by="ID",all=TRUE)
+aff_dyn_YES <- merge(aff_dyn_YES,beta_Bip_aff,by="ID",all=TRUE)
+
+##################### Delete intercept from aff_dyn files #####################
+aff_dyn_YES<-subset(aff_dyn_YES, select=c(1:9,11,13))
+names(aff_dyn_YES)
+
+
+```
+### Merging
+
+```{r YES merging, cache=FALSE}
+
+##################### restructure depression/demographics data #####################
+#The dataset was in longformat, however the affective dynamics measures are in wide format
+#Thus, I restructure the dataset (which only contain time-invariant variables anyway)
+#and merge with the affective dynamics data
+data_id_dep_YES <- subset(dataset7_YES_processed, select=c("ID","Sex","Age","DepB","DepF"))
+data_id_dep_YES<-data_id_dep_YES %>% group_by(ID) %>% summarise_all(mean)
+
+##################### Merge affective dynamics and depression/demographics data #####################
+datasetYES_final <- merge(data_id_dep_YES,aff_dyn_YES,by="ID",all=TRUE)
+names(datasetYES_final)
+
+
+```
+
+
+### Winzorising and transformation of skewed variables
+
+```{r YES transformation + winsorizing, cache=FALSE}
+
+##################### winsorizing #####################
+names(datasetYES_final)
+
+datasetYES_final<-datasetYES_final[order(datasetYES_final$ID) , ]
+
+psych::describe(datasetYES_final)
+
+dataYES_finalW<-data.frame(datasetYES_final)
+
+#select predictors and outcome variables (affective dynamics and depression)
+predictor_wins<-c(4,5,7,8,10:15)
+
+#winsorizing
+dataYES_finalW<-apply(dataYES_finalW[,predictor_wins], 
+                                 2,  
+                                 Winsorize, probs=c(0.01,0.99), na.rm = TRUE)
+
+dataYES_finalW<-data.frame(dataYES_finalW)
+
+psych::describe(dataYES_finalW)               
+
+#add id number
+dataYES_finalW$ID <- datasetYES_final$ID
+
+#make subset of variables that were not included in the winsorizing
+sub1<-subset(datasetYES_final, select=c(1:3,6,9))
+
+#Merge files
+dataYES_finalW <- merge(dataYES_finalW,sub1,by="ID",all=TRUE)
+
+##################### Transforming ###################### 
+#if skewness is > 3 (Kline, 2011)
+#### identifying ####
+skew<-skew(select(dataYES_finalW, -ID))>3
+skew
+
+length(skew[skew== TRUE])
+
+#no transformations necessary
+
+names(dataYES_finalW)
+
+
+```
+
+### Center/standardize study variables
+
+- Center of predictors (for moderation)
+
+- Standardization of the depression scale
+
+```{r YES center predictors, cache=FALSE}
+
+names(dataYES_finalW)
+
+psych::describe(dataYES_finalW)
+
+
+##################### center predictors #####################
+predictor_scale<-c(4:11)
+
+dataYES_finalWC<-apply(dataYES_finalW[,predictor_scale], 
+                           2,  
+                           scale, scale = FALSE)
+
+dataYES_finalWC<-data.frame(dataYES_finalWC)
+
+psych::describe(dataYES_finalWC)               
+
+#add id number
+dataYES_finalWC$ID<- dataYES_finalW$ID
+
+#make subset of variables that were not included in the standardization
+sub2<-subset(dataYES_finalW, select=c(1:3,12:15))
+
+#Merge files
+dataYES_finalWC <- merge(dataYES_finalWC,sub2,by="ID",all=TRUE)
+
+##################### standardize Depression #####################
+dataYES_finalWC$DepB<-scale(dataYES_finalWC$DepB, center = TRUE, scale = TRUE)
+dataYES_finalWC$DepF<-scale(dataYES_finalWC$DepF, center = TRUE, scale = TRUE)
+
+psych::describe(dataYES_finalWC)
+
+
+names(dataYES_finalWC)
+
+
+```
+
+
+
+
+
+# MERGING ALL DATASETS
+
+
+## Raw data
+
+The raw data I need for showing the descriptives (means and SD's)
+
+```{r mega-analysis merging raw, cache=FALSE}
+
+####################### add unique study number ####################### 
+dataRADAR_finalW$study <- 1
+dataSM_finalW$study <- 2
+dataMA_finalW$study <- 3
+dataED_finalW$study <- 4
+dataEA_finalW$study <- 5
+dataLASER_finalW$study <- 6
+dataYES_finalW$study <- 7
+
+####################### merge all datasets ####################### 
+mega_all <- dplyr::bind_rows(dataRADAR_finalW, dataSM_finalW,dataMA_finalW,dataED_finalW,dataEA_finalW,dataLASER_finalW,dataYES_finalW)
+
+#### sex and study as factor ####
+mega_all$Sex <- as.factor(mega_all$Sex)
+mega_all$study <- as.factor(mega_all$study)
+
+#### icount as numeric ####
+mega_all$icountNA <- as.numeric(mega_all$icountNA)
+mega_all$icountPA <- as.numeric(mega_all$icountPA)
+mega_all$icountBip <- as.numeric(mega_all$icountBip)
+
+#### add new ID number ####
+mega_all$MegaID <- 1:length(mega_all$ID)
+
+#### Make dummy variables from study ####
+mega_all <- dummy_cols(mega_all, select_columns = 'study')
+
+str(mega_all)
+
+#check for NaN's
+df <- as.data.frame(cbind(lapply(lapply(mega_all, is.nan), sum)))
+rownames(subset(df, df$V1 != 0))
+
+####################### make mega dataset excluding datasets 6 and 7  ####################### 
+# As explained in the paper, we ran analyses for all datasets and where dataset 6 and 7 were excluded
+# So, there I am making a new dataset excluding those studies
+mega_all_5 <-subset(mega_all, study == "1" | study == "2" | study == "3" | study == "4" | study == "5")
+
+
+
+```
+
+
+
+
+## Centered and standardized data
+
+The centered and standardized data I need for main analyses
+
+```{r mega-analysis merging cen std, cache=FALSE}
+
+####################### add unique study number ####################### 
+dataRADAR_finalWC$study <- 1
+dataSM_finalWC$study <- 2
+dataMA_finalWC$study <- 3
+dataED_finalWC$study <- 4
+dataEA_finalWC$study <- 5
+dataLASER_finalWC$study <- 6
+dataYES_finalWC$study <- 7
+
+####################### merge all datasets ####################### 
+mega_all_cen_std<- dplyr::bind_rows(dataRADAR_finalWC, dataSM_finalWC,dataMA_finalWC,dataED_finalWC,dataEA_finalWC,dataLASER_finalWC,dataYES_finalWC)
+
+#### sex and study as factor ####
+mega_all_cen_std$Sex <- as.factor(mega_all_cen_std$Sex)
+mega_all_cen_std$study <- as.factor(mega_all_cen_std$study)
+
+#### icount as numeric ####
+mega_all_cen_std$icountNA <- as.numeric(mega_all_cen_std$icountNA)
+mega_all_cen_std$icountPA <- as.numeric(mega_all_cen_std$icountPA)
+mega_all_cen_std$icountBip <- as.numeric(mega_all_cen_std$icountBip)
+
+#### add new ID number ####
+mega_all_cen_std$MegaID <- 1:length(mega_all_cen_std$ID)
+
+#### Make dummy variables from study ####
+mega_all_cen_std<- dummy_cols(mega_all_cen_std, select_columns = 'study')
+
+str(mega_all_cen_std)
+
+#check for NaN's
+df <- as.data.frame(cbind(lapply(lapply(mega_all_cen_std, is.nan), sum)))
+rownames(subset(df, df$V1 != 0))
+
+####################### make mega dataset excluding datasets 6 and 7  ####################### 
+# As explained in the paper, we ran analyses for all datasets and where dataset 6 and 7 were excluded
+# So, there I am making a new dataset excluding those studies
+mega_all_cen_std_5 <-subset(mega_all_cen_std, study == "1" | study == "2" | study == "3" | study == "4" | study == "5")
+
+
+```
+
+
+
+
+# DESCRIPTIVES ALL STUDIES
+
+
+## Sample size before exclusion compliance
+
+```{r before exclusion n, cache=FALSE, echo=FALSE}
+
+totaln_inds_orig<-c(n_RADAR_orig,n_SM_orig,n_MA_orig,n_ED_orig,n_EA_orig,n_LASER_orig,n_YES_orig)
+totaln_orig <- sum(n_RADAR_orig,n_SM_orig,n_MA_orig,n_ED_orig,n_EA_orig,n_LASER_orig,n_YES_orig)
+
+finaln<-data.frame(Study=c("RADAR", "Swinging Moods", "Mood in Emerging Adults", "Emotions in daily life", "Emotion Regulation in Action","LASER", "YES",  "Total Sample Size"),
+               final_n=c(n_RADAR_orig,n_SM_orig,n_MA_orig,n_ED_orig,n_EA_orig,n_LASER_orig,n_YES_orig,totaln_orig))
+                       
+pander(finaln,caption = "Sample size before exclusion compliance")
+
+round(mean(totaln_inds_orig),digits=0)
+range(totaln_inds_orig)
+
+```
+
+
+## Final sample size 
+
+```{r final n, cache=FALSE, echo=FALSE}
+
+totaln_inds<-c(n_fin_RADAR,n_fin_SM,n_fin_MA,n_fin_ED,n_fin_EA,n_fin_LASER,n_fin_YES,n_fin_LASER)
+totaln <- sum(n_fin_RADAR,n_fin_SM,n_fin_MA,n_fin_ED,n_fin_EA,n_fin_LASER,n_fin_YES)
+
+finaln<-data.frame(Study=c("RADAR", "Swinging Moods", "Mood in Emerging Adults", "Emotions in daily life", "Emotion Regulation in Action","LASER", "YES",  "Total Sample Size"),
+               final_n=c(n_fin_RADAR,n_fin_SM,n_fin_MA,n_fin_ED,n_fin_EA,n_fin_LASER,n_fin_YES,totaln))
+                       
+pander(finaln,caption = "Final sample size")
+
+round(mean(totaln_inds),digits=0)
+range(totaln_inds)
+
+```
+
+## Percentage of Included Cases
+
+This is the percentage of included cases from the initial sample per dataset after excluding participants with fewer than 50% and 0 variance (the latter, there were only 3 participants excluded overall)
+
+```{r exclusion, cache=FALSE, echo=FALSE}
+
+inc<-data.frame(study=c("RADAR", "Swinging Moods", "Mood in Emerging Adults","Emotions in daily life", "Emotion Regulation in Action", "LASER", "YES"),
+               final_p=round(c(perc_inc_RADAR,perc_inc_SM,perc_inc_MA,perc_inc_ED,perc_inc_EA,perc_inc_LASER,perc_inc_YES), digits = 1))
+
+pander(inc,caption = "Percentage of Included Cases")
+
+
+mean(inc$final_p)
+range(inc$final_p)
+
+# How many were excluded overall?
+(100/totaln_orig)*totaln
+
+```
+
+## Compliance
+
+### Percentage of answered beeps
+
+```{r compliance percentage, cache=FALSE, echo=FALSE}
+com_p<-data.frame(study=c("RADAR", "Swinging Moods", "Mood in Emerging Adults","Emotions in daily life", "Emotion Regulation in Action",  "LASER","YES"),
+               beep_p=round(c(mean_com_per_RADAR,mean_com_per_SM,mean_com_per_MA,mean_com_per_ED,mean_com_per_EA,mean_com_per_LASER,mean_com_per_YES), digits=1))
+
+pander(com_p,caption = "Percentage of answered beeps")
+
+mean(com_p$beep_p)
+range(com_p$beep_p)
+
+```
+
+### Mean number of answered beeps
+
+```{r compliance, cache=FALSE, echo=FALSE}
+com_m<-data.frame(study=c("RADAR", "Swinging Moods", "Mood in Emerging Adults","Emotions in daily life", "Emotion Regulation in Action", "LASER", "YES"),
+               mean_compliance=round(c(mean_comp_RADAR, mean_comp_SM,mean_comp_MA,mean_comp_ED,mean_comp_EA,mean_comp_LASER,mean_comp_YES),digits=1))
+                       
+pander(com_m,caption = "Mean number of answered beeps")
+
+```
+
+
+# MEGA-ANALYSIS
+
+The significant interaction effect was: NA variability x NA level --> Baseline depression (datasets 1-5 only)  
+
+
+
+```{r mega-analysis mod with ML B NA final, cache=FALSE}
+
+lm_Base_NA_SDAR_mod<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 + isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_NA_SDAR_mod,digits = getOption("jtools-digits", 3)) 
+summ(lm_Base_NA_SDAR_mod,digits = getOption("jtools-digits", 3),confint = TRUE,scale = TRUE, transform.response = TRUE)
+car::vif(lm_Base_NA_SDAR_mod,type = 'predictor')
+
+```
+
