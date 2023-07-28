@@ -47,6 +47,8 @@ library(here) #for finding files
 library(plyr) #for data wrangling
 library(dplyr)#for data wrangling
 library(ggplot2) #for data visualization
+library(RColorBrewer) # for data visualization
+library(scales) # for data visualization
 library(ggpubr) #for data visualization
 library(lme4) #for autocorrelation and ICCs
 library(optimx) #optimizer for MLM models
@@ -63,6 +65,8 @@ library(jtools) #for nice regression tables
 library(car) #for VIF
 library(metafor) #for pooled correlations
 library(relativeVariability) #for calculating relative SD
+library(purrr) 
+library(cowplot)
 
 set.alignment('left', row.names = 'right') #for alignment of tables
 
@@ -5524,41 +5528,38 @@ Conclusion: It is not!
 
 ```{r mega-analysis ACORSD  mod with ML B NA final twostage, cache=FALSE}
 
-### Standard deviation
 ## Individual regressions
-#dataset1
-dataset1 <- mega_all_cen_std_5 %>%dplyr::filter(study == "1") 
-lm_df1_int_SD<-lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=dataset1)
-st_lm_df1_int_SD<-summ(lm_df1_int_SD,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
-df1_int_SD<-st_lm_df1_int_SD$coeftable[7,1]
 
-#dataset2
-dataset2 <- mega_all_cen_std_5 %>%dplyr::filter(study == "2") 
-lm_df2_int_SD<-lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=dataset2)
-st_lm_df2_int_SD<-summ(lm_df2_int_SD,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
-df2_int_SD<-st_lm_df2_int_SD$coeftable[7,1]
+# Create a vector of study IDs
+study_ids <- c("1", "2", "3", "4", "5")
 
-#dataset3
-dataset3 <- mega_all_cen_std_5 %>%dplyr::filter(study == "3") 
-lm_df3_int_SD<-lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=dataset3)
-st_lm_df3_int_SD<-summ(lm_df3_int_SD,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
-df3_int_SD<-st_lm_df3_int_SD$coeftable[7,1]
+# Initialize an empty list to store the results
+results_list <- list()
 
-#dataset4
-dataset4 <- mega_all_cen_std_5 %>%dplyr::filter(study == "4") 
-lm_df4_int_SD<-lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=dataset4)
-st_lm_df4_int_SD<-summ(lm_df4_int_SD,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
-df4_int_SD<-st_lm_df4_int_SD$coeftable[7,1]
+# Loop through each study ID
+for (study_id in study_ids) {
+  # Filter the dataset based on the study ID
+  dataset <- mega_all_cen_std_5 %>% filter(study == study_id)
+  
+  # Perform the linear regression
+  lm_model <- lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data = dataset)
+  
+  # Get the summary of the linear regression
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+  
+  # Extract the coefficient value of interest (7th row, 1st column)
+  df_int_SD <- st_lm_model$coeftable[7, 1]
+  
+  # Store the result in the list
+  results_list[[paste0("df", study_id, "_int_SD")]] <- df_int_SD
+}
 
-#dataset5
-dataset5 <- mega_all_cen_std_5 %>%dplyr::filter(study == "5") 
-lm_df5_int_SD<-lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=dataset5)
-st_lm_df5_int_SD<-summ(lm_df5_int_SD,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
-df5_int_SD<-st_lm_df5_int_SD$coeftable[7,1]
+# Unlist the results to get separate variables (df1_int_SD, df2_int_SD, etc.)
+SD_NA_5 <- unlist(results_list)
+
 
 ## Meta-analysis with metafor package
 #bind moderation effects
-SD_NA_5<-c(df1_int_SD,df2_int_SD,df3_int_SD,df4_int_SD,df5_int_SD)
 names<-c("dataset 1", "dataset 2", "dataset 3", "dataset 4", "dataset 5")
 meta_SD<-as.data.frame(cbind(names,nstudy5,SD_NA_5))
 meta_SD$nstudy5<-as.numeric(meta_SD$nstudy5)
@@ -6122,6 +6123,576 @@ summ(lm_FU_NA_autocor_mod,digits = getOption("jtools-digits", 3), confint = TRUE
 ```
 
 
+# EXTRA ANALYSES
+
+In July 2023, we added the following analyses after reviews. 
+
+## Relative SD
+
+The reviewer was concerned about the known confounding between the SD and the mean and
+was wondering whether the main result of the interaction holds when with the relative SD.
+To address this comment, we repeated the main model with the relative SD, following the procedures of Mestdagh et al. (2018).
+
+
+```{r mega-analysis rel SD, cache=FALSE}
+
+# Model 1: Main effect of inertia and variability
+lm_Base_NA_SDAR_main1_rel<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 + relisdNA + autocorNA + Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_NA_SDAR_main1_rel,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_NA_SDAR_main1_rel,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE) 
+
+# Model 2: Controlling for Level
+lm_Base_NA_SDAR_main2_rel<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 + relisdNA + autocorNA + imeanNA + Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_NA_SDAR_main2_rel,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_NA_SDAR_main2_rel,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE) 
+
+# Model 3: Interaction
+lm_Base_NA_SDAR_mod_rel<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 + relisdNA + autocorNA + imeanNA + relisdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_NA_SDAR_mod_rel,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_NA_SDAR_mod_rel,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE) 
+
+```
+
+## Influence of sampling frequency
+
+We got the comment whether sampling frequency has an influence on the results.
+To address this comment, we plotted individual estimates per study, together with
+the sampling frequency. I additionally added analyses, where I included interactions between the sampling
+frequency and the predictors. A significant interaction should indicate that the effect
+of one of our predictors on depression depends on the sampling frequency.
+However, sampling frequency is a stable between-study variable with little variation and as such
+the results should only be used for visual inspection, but do not allow any hard conclusions.
+
+
+Note that dataset 5 had 4 beeps on Friday and 9 beeps on Saturday and Sunday. 
+For these extra analyses, I took the mean of those beeps, which are rounded 7.
+
+### Add sampling frequency to overall datasets
+
+```{r mega-analysis sampling freq add, cache=FALSE}
+mega_all_cen_std <- mega_all_cen_std %>% 
+  dplyr::mutate(sampling =
+                       ifelse(study == 1, 1,
+                              ifelse(study == 2, 10,
+                                     ifelse(study == 3 | study == 4, 5,
+                                            ifelse(study == 5, 7,
+                                                   ifelse(study == 6 | study == 7, 3, NA))))))
+
+# Subset other datasets
+mega_all_cen_std_3 <- mega_all_cen_std %>%
+  dplyr::filter(study == "1" | study == "2" | study == "3") 
+
+mega_all_cen_std_4 <- mega_all_cen_std %>%
+  dplyr::filter(study == "1" | study == "2" | study == "3" | study == "7") 
+
+mega_all_cen_std_5 <- mega_all_cen_std %>%
+  dplyr::filter(study == "1" | study == "2" | study == "3" | study == "4" | study == "5")  
+
+```
+
+### Positive Affect Baseline
+
+#### Sampling frequency as moderator
+
+```{r mega-analysis sampling freq PA B analysis, cache=FALSE}
+
+## Main effects only
+lm_Base_PA_SDAR_main1_sam<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 +
+                                isdPA + autocorPA + imeanPA +
+                                sampling:isdPA + sampling:autocorPA + sampling:imeanPA +
+                                Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_PA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_PA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+# significant interaction for isdPA:sampling. Following up with Johnson Neyman
+johnson_neyman(lm_Base_PA_SDAR_main1_sam, pred=isdPA, modx=sampling, plot = TRUE) #plot
+
+## Interaction effects 
+lm_Base_PA_SDAR_mod_sam<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 +
+                                isdPA + autocorPA + imeanPA + isdPA:imeanPA + autocorPA:imeanPA +
+                                sampling:isdPA + sampling:autocorPA + sampling:imeanPA +
+                                sampling:isdPA:imeanPA + sampling:autocorPA:imeanPA +
+                                Age + Sex, data=mega_all_cen_std_5)
+summ(lm_Base_PA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_PA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+```
+
+#### Individual estimates
+
+```{r mega-analysis sampling freq PA B graph, cache=FALSE}
+
+# Create a vector of study IDs & sampling frequency to be included
+study_ids <- c(1:5)
+sampling <- c(1, 10, 5, 5, 7)
+study_name <- c("dataset 1", "dataset 2", "dataset 3", "dataset 4", "dataset 5")
+
+# Define a function to extract coefficients and CI values for main effects
+fun_PA_B <- function(study_id) {
+  dataset <- mega_all_cen_std_5 %>% filter(study == study_id)
+  lm_model <- lm(DepB ~ isdPA + autocorPA + imeanPA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+  
+  data.frame(StudyID = study_id,
+             SD = st_lm_model$coeftable[2, 1],
+             SD_CI_lower = st_lm_model$coeftable[2, 2],
+             SD_CI_upper = st_lm_model$coeftable[2, 3],
+             AR = st_lm_model$coeftable[3, 1],
+             AR_CI_lower = st_lm_model$coeftable[3, 2],
+             AR_CI_upper = st_lm_model$coeftable[3, 3],
+             M = st_lm_model$coeftable[4, 1],
+             M_CI_lower = st_lm_model$coeftable[4, 2],
+             M_CI_upper = st_lm_model$coeftable[4, 3])
+}
+
+# Use map function to apply the extraction function to each study_id
+results_PA_B_main <- map_dfr(study_ids, fun_PA_B)
+
+# Define a function to extract coefficients and CI values for interaction effects
+fun_PA_B_mod <- function(study_id) {
+  dataset <- mega_all_cen_std_5 %>% filter(study == study_id)
+  lm_model <- lm(DepB ~ isdPA + autocorPA + imeanPA + isdPA:imeanPA + autocorPA:imeanPA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+
+  data.frame(StudyID = study_id,
+             SD_int = st_lm_model$coeftable[7, 1],
+             SD_int_CI_lower = st_lm_model$coeftable[7, 2],
+             SD_int_CI_upper = st_lm_model$coeftable[7, 3],
+             AR_int = st_lm_model$coeftable[8, 1],
+             AR_int_CI_lower = st_lm_model$coeftable[8, 2],
+             AR_int_CI_upper = st_lm_model$coeftable[8, 3])
+}
+
+
+
+# Use map function to apply the extraction function to each study_id
+results_PA_B_mod <- map_dfr(study_ids, fun_PA_B_mod)
+
+# Bind & Add sampling frequency & remove StudyID which is in there twice
+results_PA_B <- cbind(study_name, sampling, results_PA_B_main, results_PA_B_mod)[, -13]
+
+# Sort by Sampling frequency
+results_PA_B <- results_PA_B %>% arrange(sampling)
+
+# Plot the estimates per study with confidence intervals
+# Create a function to generate the ggplot for each type of plot (SD, AR, Mean)
+generate_ggplot <- function(data, y_var, y_lower, y_upper, ylab) {
+  ggplot(data, aes(x = sampling, y = {{ y_var }}, ymin = {{ y_lower }}, ymax = {{ y_upper }})) +
+    geom_point(aes(color = as.factor(study_name)), size = 2) +
+    geom_errorbar(aes(color = as.factor(study_name)), width = 0.2, linewidth = 0.5) +
+    labs(x = "Sampling frequency per day", y = ylab, color = "Study") +  
+    scale_x_continuous(breaks = seq(0, 10, 1)) +
+    theme_classic() +
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_color_brewer(palette = "Dark2")
+}
+
+# Individual Plots
+plot_sd <- generate_ggplot(results_PA_B, SD, SD_CI_lower, SD_CI_upper, "Main effect \nVariability") + 
+  coord_cartesian(ylim = c(-0.4, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar <- generate_ggplot(results_PA_B, AR, AR_CI_lower, AR_CI_upper, "Main effect \nInertia") + 
+  coord_cartesian(ylim = c(-0.5, 0.3)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_mean <- generate_ggplot(results_PA_B, M, M_CI_lower, M_CI_upper, "Main effect \nLevel") + 
+  coord_cartesian(ylim = c(-0.5, 0.3)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_sd_m <- generate_ggplot(results_PA_B, SD_int, SD_int_CI_lower, SD_int_CI_upper, "Interaction \nVariability &\n Level") + 
+  coord_cartesian(ylim = c(-0.3, 0.6)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar_m <- generate_ggplot(results_PA_B, AR_int, AR_int_CI_lower, AR_int_CI_upper, "Interaction \nInertia &\n Level") + 
+  coord_cartesian(ylim = c(-0.3, 0.6)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+
+# Arrange the plots with a shared title and some spacing
+combined_PA_B <- cowplot::plot_grid( 
+                                    plot_sd + theme(legend.position="none"), 
+                                    plot_ar + theme(legend.position="none"),
+                                    plot_mean + theme(legend.position="none"),
+                                    plot_sd_m + theme(legend.position="none"),
+                                    plot_ar_m + theme(legend.position="none"),
+                                    ncol = 1)
+
+# extract the legend from one of the plots
+legend <- get_legend(
+  # create some space to the left of the legend
+  plot_sd + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+combined_PA_B <- plot_grid(combined_PA_B, legend, rel_widths = c(3, 1))
+
+# Print
+combined_PA_B
+
+# Save the combined plot as an image (e.g., in PNG format)
+ggsave("../output/combined_PA_B.png", combined_PA_B, width = 16, height = 22, units = "cm")
+
+```
+
+### Positive Affect Follow-up
+
+#### Sampling frequency as moderator
+
+```{r mega-analysis sampling freq PA FU analysis, cache=FALSE}
+
+## Main effects only
+lm_FU_PA_SDAR_main1_sam<-lm(DepF ~ DepB + study_2 + study_3 +
+                                isdPA + autocorPA + imeanPA +
+                                sampling:isdPA + sampling:autocorPA + sampling:imeanPA +
+                                Age + Sex, data=mega_all_cen_std_3)
+summ(lm_FU_PA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_FU_PA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+## Interaction effects 
+lm_FU_PA_SDAR_mod_sam<-lm(DepF ~ DepB + study_2 + study_3 + 
+                                isdPA + autocorPA + imeanPA + isdPA:imeanPA + autocorPA:imeanPA +
+                                sampling:isdPA + sampling:autocorPA + sampling:imeanPA +
+                                sampling:isdPA:imeanPA + sampling:autocorPA:imeanPA +
+                                Age + Sex, data=mega_all_cen_std_3)
+summ(lm_FU_PA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_FU_PA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+```
+
+#### Individual estimates
+
+
+```{r mega-analysis sampling freq PA FU, cache=FALSE}
+
+# Create a vector of study IDs & sampling frequency to be included
+study_ids <- c(1:3)
+sampling <- c(1, 10, 5)
+study_name <- c("dataset 1", "dataset 2", "dataset 3")
+
+# Define a function to extract coefficients and CI values for main effects
+fun_PA_F <- function(study_id) {
+  dataset <- mega_all_cen_std_3 %>% filter(study == study_id)
+  lm_model <- lm(DepF ~ DepB + isdPA + autocorPA + imeanPA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+  
+  data.frame(StudyID = study_id,
+             SD = st_lm_model$coeftable[3, 1],
+             SD_CI_lower = st_lm_model$coeftable[3, 2],
+             SD_CI_upper = st_lm_model$coeftable[3, 3],
+             AR = st_lm_model$coeftable[4, 1],
+             AR_CI_lower = st_lm_model$coeftable[4, 2],
+             AR_CI_upper = st_lm_model$coeftable[4, 3],
+             M = st_lm_model$coeftable[5, 1],
+             M_CI_lower = st_lm_model$coeftable[5, 2],
+             M_CI_upper = st_lm_model$coeftable[5, 3])
+}
+
+# Use map function to apply the extraction function to each study_id
+results_PA_F_main <- map_dfr(study_ids, fun_PA_F)
+
+# Define a function to extract coefficients and CI values for interaction effects
+fun_PA_F_mod <- function(study_id) {
+  dataset <- mega_all_cen_std_3 %>% filter(study == study_id)
+  lm_model <- lm(DepF ~ DepB + isdPA + autocorPA + imeanPA + isdPA:imeanPA + autocorPA:imeanPA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+
+  data.frame(StudyID = study_id,
+             SD_int = st_lm_model$coeftable[8, 1],
+             SD_int_CI_lower = st_lm_model$coeftable[8, 2],
+             SD_int_CI_upper = st_lm_model$coeftable[8, 3],
+             AR_int = st_lm_model$coeftable[9, 1],
+             AR_int_CI_lower = st_lm_model$coeftable[9, 2],
+             AR_int_CI_upper = st_lm_model$coeftable[9, 3])
+}
+
+# Use map function to apply the extraction function to each study_id
+results_PA_F_mod <- map_dfr(study_ids, fun_PA_F_mod)
+
+# Bind & Add sampling frequency & remove StudyID which is in there twice
+results_PA_F <- cbind(study_name, sampling, results_PA_F_main, results_PA_F_mod)[, -13]
+
+# Sort by Sampling frequency
+results_PA_F <- results_PA_F %>% arrange(sampling)
+
+# Individual Plots
+plot_sd <- generate_ggplot(results_PA_F, SD, SD_CI_lower, SD_CI_upper, "Main effect \nVariability") + 
+  coord_cartesian(ylim = c(-0.3, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar <- generate_ggplot(results_PA_F, AR, AR_CI_lower, AR_CI_upper, "Main effect \nInertia") + 
+  coord_cartesian(ylim = c(-0.3, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_mean <- generate_ggplot(results_PA_F, M, M_CI_lower, M_CI_upper, "Main effect \nLevel") + 
+  coord_cartesian(ylim = c(-0.4, 0.1)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_sd_m <- generate_ggplot(results_PA_F, SD_int, SD_int_CI_lower, SD_int_CI_upper, "Interaction \nVariability & Level") + 
+  coord_cartesian(ylim = c(-0.3, 0.2)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar_m <- generate_ggplot(results_PA_F, AR_int, AR_int_CI_lower, AR_int_CI_upper, "Interaction \nInertia & Level") + 
+  coord_cartesian(ylim = c(-0.3, 0.2)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+
+# Arrange the plots with a shared title and some spacing
+combined_PA_F <- cowplot::plot_grid( 
+                                    plot_sd + theme(legend.position="none"), 
+                                    plot_ar + theme(legend.position="none"),
+                                    plot_mean + theme(legend.position="none"),
+                                    plot_sd_m + theme(legend.position="none"),
+                                    plot_ar_m + theme(legend.position="none"),
+                                    ncol = 1)
+
+# extract the legend from one of the plots
+legend <- get_legend(
+  # create some space to the left of the legend
+  plot_sd + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+combined_PA_F <- plot_grid(combined_PA_F, legend, rel_widths = c(3, 1))
+
+# Print
+combined_PA_F
+
+# Save the combined plot as an image (e.g., in PNG format)
+ggsave("../output/combined_PA_F.png", combined_PA_F, width = 16, height = 22, units = "cm")
+
+```
+
+### Negative Affect Baseline
+
+#### Sampling frequency as moderator
+
+```{r mega-analysis sampling freq NA B analysis, cache=FALSE}
+
+## Main effects only
+lm_Base_NA_SDAR_main1_sam<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 + study_6 + study_7 +
+                                isdNA + autocorNA + imeanNA +
+                                sampling:isdNA + sampling:autocorNA + sampling:imeanNA +
+                                Age + Sex, data=mega_all_cen_std)
+summ(lm_Base_NA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_NA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+## Interaction effects 
+lm_Base_NA_SDAR_mod_sam<-lm(DepB ~ study_2 + study_3 + study_4 + study_5 +
+                                isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA +
+                                sampling:isdNA + sampling:autocorNA + sampling:imeanNA +
+                                sampling:isdNA:imeanNA + sampling:autocorNA:imeanNA +
+                                Age + Sex, data=mega_all_cen_std)
+summ(lm_Base_NA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_Base_NA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+```
+
+
+#### Individual estimates
+
+
+```{r mega-analysis sampling freq NA B, cache=FALSE}
+
+# Create a vector of study IDs & sampling frequency to be included
+study_ids <- c(1:7)
+sampling <- c(1, 10, 5, 5, 7, 3, 3)
+study_name <- c("dataset 1", "dataset 2", "dataset 3", "dataset 4", "dataset 5", "dataset 6", "dataset 7")
+
+# Define a function to extract coefficients and CI values for main effects
+fun_NA_B <- function(study_id) {
+  dataset <- mega_all_cen_std %>% filter(study == study_id)
+  lm_model <- lm(DepB ~ isdNA + autocorNA + imeanNA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+  
+  data.frame(StudyID = study_id,
+             SD = st_lm_model$coeftable[2, 1],
+             SD_CI_lower = st_lm_model$coeftable[2, 2],
+             SD_CI_upper = st_lm_model$coeftable[2, 3],
+             AR = st_lm_model$coeftable[3, 1],
+             AR_CI_lower = st_lm_model$coeftable[3, 2],
+             AR_CI_upper = st_lm_model$coeftable[3, 3],
+             M = st_lm_model$coeftable[4, 1],
+             M_CI_lower = st_lm_model$coeftable[4, 2],
+             M_CI_upper = st_lm_model$coeftable[4, 3])
+}
+
+# Use map function to apply the extraction function to each study_id
+results_NA_B_main <- map_dfr(study_ids, fun_NA_B)
+
+# Define a function to extract coefficients and CI values for interaction effects
+fun_NA_B_mod <- function(study_id) {
+  dataset <- mega_all_cen_std %>% filter(study == study_id)
+  lm_model <- lm(DepB ~ isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+
+  data.frame(StudyID = study_id,
+             SD_int = st_lm_model$coeftable[7, 1],
+             SD_int_CI_lower = st_lm_model$coeftable[7, 2],
+             SD_int_CI_upper = st_lm_model$coeftable[7, 3],
+             AR_int = st_lm_model$coeftable[8, 1],
+             AR_int_CI_lower = st_lm_model$coeftable[8, 2],
+             AR_int_CI_upper = st_lm_model$coeftable[8, 3])
+}
+
+
+
+# Use map function to apply the extraction function to each study_id
+results_NA_B_mod <- map_dfr(study_ids, fun_NA_B_mod)
+
+# Bind & Add sampling frequency & remove StudyID which is in there twice
+results_NA_B <- cbind(study_name, sampling, results_NA_B_main, results_NA_B_mod)[, -13]
+
+# Sort by Sampling frequency
+results_NA_B <- results_NA_B %>% arrange(sampling)
+
+# Individual Plots
+plot_sd <- generate_ggplot(results_NA_B, SD, SD_CI_lower, SD_CI_upper, "Main effect \nVariability") + 
+  coord_cartesian(ylim = c(-0.6, 0.6)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar <- generate_ggplot(results_NA_B, AR, AR_CI_lower, AR_CI_upper, "Main effect \nInertia") + 
+  coord_cartesian(ylim = c(-0.6, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_mean <- generate_ggplot(results_NA_B, M, M_CI_lower, M_CI_upper, "Main effect \nLevel") + 
+  coord_cartesian(ylim = c(-0.2, 1)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_sd_m <- generate_ggplot(results_NA_B, SD_int, SD_int_CI_lower, SD_int_CI_upper, "Interaction  \nVariability & Level") + 
+  coord_cartesian(ylim = c(-0.5, 0.2)) + scale_y_continuous(breaks = pretty_breaks(n = 6))
+plot_ar_m <- generate_ggplot(results_NA_B, AR_int, AR_int_CI_lower, AR_int_CI_upper, "Interaction \nInertia & Level") + 
+  coord_cartesian(ylim = c(-0.2, 0.5)) + scale_y_continuous(breaks = pretty_breaks(n = 6))
+
+# Arrange the plots with a shared title and some spacing
+combined_NA_B <- cowplot::plot_grid( 
+                                    plot_sd + theme(legend.position="none"), 
+                                    plot_ar + theme(legend.position="none"),
+                                    plot_mean + theme(legend.position="none"),
+                                    plot_sd_m + theme(legend.position="none"),
+                                    plot_ar_m + theme(legend.position="none"),
+                                    ncol = 1)
+
+
+
+# extract the legend from one of the plots
+legend <- get_legend(
+  # create some space to the left of the legend
+  plot_sd + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+combined_NA_B <- plot_grid(combined_NA_B, legend, rel_widths = c(3, 1))
+
+# Print
+combined_NA_B
+
+# Save the combined plot as an image (e.g., in PNG format)
+ggsave("../output/combined_NA_B.png", combined_NA_B, width = 16, height = 22, units = "cm")
+
+```
+
+### Negative Affect Follow-up
+
+#### Sampling frequency as moderator
+
+```{r mega-analysis sampling freq NA FU analysis, cache=FALSE}
+
+## Main effects only
+lm_FU_NA_SDAR_main1_sam<-lm(DepF ~ DepB + study_2 + study_3 + study_7 +
+                                isdNA + autocorNA + imeanNA +
+                                sampling:isdNA + sampling:autocorNA + sampling:imeanNA +
+                                Age + Sex, data=mega_all_cen_std_4)
+summ(lm_FU_NA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_FU_NA_SDAR_main1_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+## Interaction effects 
+lm_FU_NA_SDAR_mod_sam<-lm(DepF ~ DepB + study_2 + study_3 + study_7 +
+                                isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA +
+                                sampling:isdNA + sampling:autocorNA + sampling:imeanNA +
+                                sampling:isdNA:imeanNA + sampling:autocorNA:imeanNA +
+                                Age + Sex, data=mega_all_cen_std_4)
+summ(lm_FU_NA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), vifs=TRUE)
+summ(lm_FU_NA_SDAR_mod_sam,digits = getOption("jtools-digits", 3), confint = TRUE,scale = TRUE, transform.response = TRUE)
+
+```
+
+#### Individual estimates
+
+
+```{r mega-analysis sampling freq NA FU, cache=FALSE}
+
+# Create a vector of study IDs & sampling frequency to be included
+study_ids <- c(1:3, 7)
+sampling <- c(1, 10, 5, 3)
+study_name <- c("dataset 1", "dataset 2", "dataset 3", "dataset 7")
+
+# Define a function to extract coefficients and CI values for main effects
+fun_NA_F <- function(study_id) {
+  dataset <- mega_all_cen_std_4 %>% filter(study == study_id)
+  lm_model <- lm(DepF ~ DepB + isdNA + autocorNA + imeanNA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+  
+  data.frame(StudyID = study_id,
+             SD = st_lm_model$coeftable[3, 1],
+             SD_CI_lower = st_lm_model$coeftable[3, 2],
+             SD_CI_upper = st_lm_model$coeftable[3, 3],
+             AR = st_lm_model$coeftable[4, 1],
+             AR_CI_lower = st_lm_model$coeftable[4, 2],
+             AR_CI_upper = st_lm_model$coeftable[4, 3],
+             M = st_lm_model$coeftable[5, 1],
+             M_CI_lower = st_lm_model$coeftable[5, 2],
+             M_CI_upper = st_lm_model$coeftable[5, 3])
+}
+
+# Use map function to apply the extraction function to each study_id
+results_NA_F_main <- map_dfr(study_ids, fun_NA_F)
+
+# Define a function to extract coefficients and CI values for interaction effects
+fun_NA_F_mod <- function(study_id) {
+  dataset <- mega_all_cen_std_4 %>% filter(study == study_id)
+  lm_model <- lm(DepF ~ DepB + isdNA + autocorNA + imeanNA + isdNA:imeanNA + autocorNA:imeanNA + Age + Sex, data = dataset)
+  st_lm_model <- summ(lm_model, digits = getOption("jtools-digits", 3), confint = TRUE, scale = TRUE, transform.response = TRUE)
+
+  data.frame(StudyID = study_id,
+             SD_int = st_lm_model$coeftable[8, 1],
+             SD_int_CI_lower = st_lm_model$coeftable[8, 2],
+             SD_int_CI_upper = st_lm_model$coeftable[8, 3],
+             AR_int = st_lm_model$coeftable[9, 1],
+             AR_int_CI_lower = st_lm_model$coeftable[9, 2],
+             AR_int_CI_upper = st_lm_model$coeftable[9, 3])
+}
+
+
+
+# Use map function to apply the extraction function to each study_id
+results_NA_F_mod <- map_dfr(study_ids, fun_NA_F_mod)
+
+# Bind & Add sampling frequency & remove StudyID which is in there twice
+results_NA_F <- cbind(study_name, sampling, results_NA_F_main, results_NA_F_mod)[, -13]
+
+# Sort by Sampling frequency
+results_NA_F <- results_NA_F %>% arrange(sampling)
+
+# Individual Plots
+plot_sd <- generate_ggplot(results_NA_F, SD, SD_CI_lower, SD_CI_upper, "Main effect \nVariability") + 
+  coord_cartesian(ylim = c(-0.3, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar <- generate_ggplot(results_NA_F, AR, AR_CI_lower, AR_CI_upper, "Main effect \nInertia") + 
+  coord_cartesian(ylim = c(-0.3, 0.4)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_mean <- generate_ggplot(results_NA_F, M, M_CI_lower, M_CI_upper, "Main effect \nLevel") + 
+  coord_cartesian(ylim = c(-0.3, 0.6)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_sd_m <- generate_ggplot(results_NA_F, SD_int, SD_int_CI_lower, SD_int_CI_upper, "Interaction \nVariability & Level") + 
+  coord_cartesian(ylim = c(-0.2, 0.3)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+plot_ar_m <- generate_ggplot(results_NA_F, AR_int, AR_int_CI_lower, AR_int_CI_upper, "Interaction \nInertia & Level") + 
+  coord_cartesian(ylim = c(-0.2, 0.3)) + scale_y_continuous(breaks = pretty_breaks(n = 5))
+
+# Arrange the plots with a shared title and some spacing
+combined_NA_F <- cowplot::plot_grid( 
+                                    plot_sd + theme(legend.position="none"), 
+                                    plot_ar + theme(legend.position="none"),
+                                    plot_mean + theme(legend.position="none"),
+                                    plot_sd_m + theme(legend.position="none"),
+                                    plot_ar_m + theme(legend.position="none"),
+                                    ncol = 1)
+
+
+
+# extract the legend from one of the plots
+legend <- get_legend(
+  # create some space to the left of the legend
+  plot_sd + theme(legend.box.margin = margin(0, 0, 0, 12))
+)
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+combined_NA_F <- plot_grid(combined_NA_F, legend, rel_widths = c(3, 1))
+
+# Print
+combined_NA_F
+
+# Save the combined plot as an image (e.g., in PNG format)
+ggsave("../output/combined_NA_F.png", combined_NA_F, width = 16, height = 22, units = "cm")
+
+
+```
+
 
 
 # REFERENCES
@@ -6131,6 +6702,8 @@ de Haan-Rietdijk, S., Kuppens, P., & Hamaker, E. L. (2016). What’s in a day? A
 Eisele, G., Lafit, G., Vachon, H., Kuppens, P., Houben, M., Myin-Germeys, I., & Viechtbauer, W. (2021). Affective structure, measurement invariance, and reliability across different experience sampling protocols. *Journal of Research in Personality, 92*, 104094. https://doi.org/10.1016/J.JRP.2021.104094
 
 McCabe, C. J., Kim, D. S., & King, K. M. (2018). Improving present practices in the visual display of interactions. *Advances in Methods and Practices in Psychological Science, 1* (2), 147–165. https://doi.org/10.1177/2515245917746792
+
+Mestdagh, M., Pe, M., Pestman, W., Verdonck, S., Kuppens, P., & Tuerlinckx, F. (2018). Sidelining the mean: The relative variability index as a generic mean-corrected variability measure for bounded variables. *Psychological Methods, 23*(4), 690–707. https://doi.org/10.1037/met0000153
 
 Ram, N. (2017). Analysis of Experience Sampling & EMA Data—Chapter 2.2: Univariate Intraindividual Variability Metrics (Part 2) | QuantDev Methodology. https://quantdev.ssri.psu.edu/tutorials/analysis-experience-sampling-ema-data-chapter-22-univariate-intraindividual-variability
 
