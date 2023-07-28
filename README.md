@@ -35,8 +35,10 @@ This folder refers to the processed dataset per study. See Code_Beyond-Main-Effe
 | dataset7_YES_processed	| Processed data of Dataset 7 (YES)| 
 
 ### Subfolder: 3_cleaned_data_for_OSF
-This folder contains the cleaned datasets per study (e.g., affect dynamics were calculated here). 
-There are two versions. One with predictors mean-centered and depressive symptoms standardized within studies and one where predictors are not mean-centered and depressive symptoms are not standardized. 
+This folder contains the cleaned datasets per study (e.g., affect dynamics were calculated here) as well as datasets with all pooled data (start with dataset_mega_all). 
+So, in case you want to reproduce the results of only the main analyses (section 9 MEGA-ANALYSIS in code Code_Beyond-Main-Effects_Main-analyses), then you can use the mega_all files.
+
+For both, there are two versions. One with predictors mean-centered and depressive symptoms standardized within studies and one where predictors are not mean-centered and depressive symptoms are not standardized. 
 The centered and standardized versions were used for correlation and regression analyses. 
 The non-centered and non-standardized versions were used for descriptive statistics. 
 
