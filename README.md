@@ -7,8 +7,8 @@ The data were primarily uploaded for reproducing the results. If you want to use
 
 If you have any questions, anything is unclear and/or you find a mistake, please do not hesitate to contact me under <d.f.maciejewski@tilburguniversity.edu>.
 
-## Folder: Code
-In the folder code, you can find the Rscripts (.Rmd files) plus the associated output (html files).
+## Folder: scripts
+In the folder scripts, you can find the Rscripts (.Rmd files) plus the associated output (html files).
 One disclaimer: I am not a data scientist and do not work in R for such a long time. That also means that some parts of the code could have been shorter.
 
 | Filename |	Description |
@@ -19,7 +19,7 @@ One disclaimer: I am not a data scientist and do not work in R for such a long t
 | Code_Beyond-Main-Effects_Sensitivity1_ComplianceThresholdnoexc |	Sensitivity analyses where analyses of the significant interaction effects were repeated while not excluding any individuals based on compliance.|
 | Code_Beyond-Main-Effects_Sensitivity2_mis_bet |	Sensitivity analyses where analyses of the significant interaction effects were repeated where missing data-points within days/weeks were not removed for the affect dynamic calculations. |
 
-## Folder: Data 
+## Folder: data 
 ### Subfolder: 2_processed_data_for_OSF
 
 This folder refers to the processed dataset per study. See Code_Beyond-Main-Effects_Data-preparation-for-OSF for what was done exactly.
@@ -38,7 +38,7 @@ This folder refers to the processed dataset per study. See Code_Beyond-Main-Effe
 This folder contains the cleaned datasets per study (e.g., affect dynamics were calculated here) as well as datasets with all pooled data (start with dataset_mega_all). 
 So, in case you want to reproduce the results of only the main analyses (section 9 MEGA-ANALYSIS in code Code_Beyond-Main-Effects_Main-analyses), then you can use the mega_all files.
 
-For both, there are two versions. One with predictors mean-centered and depressive symptoms standardized within studies and one where predictors are not mean-centered and depressive symptoms are not standardized. 
+For all datasets in this folder, there are two versions. One with predictors mean-centered and depressive symptoms standardized within studies and one where predictors are not mean-centered and depressive symptoms are not standardized. 
 The centered and standardized versions were used for correlation and regression analyses. 
 The non-centered and non-standardized versions were used for descriptive statistics. 
 
