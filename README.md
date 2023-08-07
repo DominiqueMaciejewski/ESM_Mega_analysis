@@ -2,7 +2,7 @@
 
 This is the github of the manuscript "Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms". 
 
-In the folder scripts, you can find the code and associated output. In the folder data, you can find the datasets used in the analyses. 
+In the folder Analyses, there are two folders: 1) the folder scripts, where you can find the code and associated output. 2) the folder data, where you can find the datasets used in the analyses. 
 The data were primarily uploaded for reproducing the results. If you want to use the data for a paper, I would appreciate if you send me an e-mail about it.
 
 If you have any questions, anything is unclear and/or you find a mistake, please do not hesitate to contact me under <d.f.maciejewski@tilburguniversity.edu>.
