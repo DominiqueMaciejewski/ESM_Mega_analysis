@@ -1,6 +1,6 @@
 ---
 title: SENSITIVITY ANALYSES I (no compliance exclusion)- Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms
-author: "BLINDED"
+author: "Dominique F. Maciejewski"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

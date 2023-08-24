@@ -1,6 +1,6 @@
 ---
 title: Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms
-author: "BLINDED"
+author: "Dominique F. Maciejewski"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # DISCLAIMER
 
 For anyone taking the time to read this script. I am not working in R for such a long time. Thus, I am not good (yet) in functions, loops, if statements etc. This script could probably been have considerably shorter. Sorry for that!
-If you have any questions or find any mistakes, please don't hesitate to e-mail me under <BLINDED>.
+If you have any questions or find any mistakes, please don't hesitate to e-mail me under <d.f.maciejewski@tilburguniversity.edu>.
 
 # DEVIATIONS FROM THE PRE-REGISTRATION
 
