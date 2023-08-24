@@ -1,5 +1,7 @@
 # Code and data for "Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms"
 
+<a href="https://zenodo.org/badge/latestdoi/670137443"><img src="https://zenodo.org/badge/670137443.svg" alt="DOI"></a>
+
 This is the github of the manuscript "Beyond main effects? Affect level as a moderator in the relation between affect dynamics and depressive symptoms". 
 
 In the folder Analyses, there are two folders: 1) the folder scripts, where you can find the code and associated output. 2) the folder data, where you can find the datasets used in the analyses. 
